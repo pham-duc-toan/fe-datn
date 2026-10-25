@@ -18,6 +18,7 @@ import { errorMessage } from "@/lib/errors";
 import { MODALITY_LABEL, ROLE_LABEL } from "@/lib/labels";
 import type { Modality, Profile } from "@/lib/types";
 import { formatDate } from "@/lib/format";
+import { usernameError } from "@/lib/tool-names";
 
 const splitList = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -30,6 +31,8 @@ export default function ProfilePage() {
 function ProfileForm({ p }: { p: Profile }) {
   const qc = useQueryClient();
   const [name, setName] = useState(p.displayName);
+  const [username, setUsername] = useState(p.username ?? "");
+  const usernameErr = username !== p.username ? usernameError(username) : null;
   const [bio, setBio] = useState(p.bio ?? "");
   const [domains, setDomains] = useState((p.skills.domains ?? []).join(", "));
   const [languages, setLanguages] = useState((p.skills.languages ?? []).join(", "));
@@ -90,13 +93,20 @@ function ProfileForm({ p }: { p: Profile }) {
               <CardTitle>Thông tin</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <Field
+                label="Username"
+                error={usernameErr ?? undefined}
+                hint="Tên đăng nhập không trùng — doanh nghiệp mời bạn vào dự án bằng tên này. Đăng nhập được bằng email hoặc username."
+              >
+                <Input value={username} maxLength={31} onChange={(e) => setUsername(e.target.value.toLowerCase())} />
+              </Field>
               <Field label="Tên hiển thị" hint="1–100 ký tự. Token mang tên mới từ lần đăng nhập / làm mới sau.">
                 <Input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
               </Field>
               <Field label="Giới thiệu" hint={`${bio.length}/500`}>
                 <Textarea rows={3} maxLength={500} value={bio} onChange={(e) => setBio(e.target.value)} />
               </Field>
-              <Button onClick={() => void run("info", () => put<Profile>("/me/profile", { displayName: name, bio: bio || null }), "Đã lưu hồ sơ")} disabled={busy === "info"}>
+              <Button onClick={() => void run("info", () => put<Profile>("/me/profile", { displayName: name, bio: bio || null, username: username.replace(/^@/, "") }), "Đã lưu hồ sơ")} disabled={busy === "info" || Boolean(usernameErr)}>
                 {busy === "info" && <Loader2 className="animate-spin" />} Lưu
               </Button>
             </CardContent>

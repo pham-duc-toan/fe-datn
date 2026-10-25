@@ -28,7 +28,7 @@ type AdminRow = { verification: IdentityVerification; email: string; displayName
 
 function Detail({ id, onDone }: { id: string; onDone: () => void }) {
   // Mỗi lần mở chi tiết, backend ghi một dòng audit "đã xem giấy tờ" (S-07).
-  const q = useQuery({ queryKey: ["idv-admin", id], queryFn: () => api<AdminRow>(`/users/admin/identity-verifications/${id}`), staleTime: 0 });
+  const q = useQuery({ queryKey: ["idv-admin", id], queryFn: () => api<AdminRow>(`/users/admin/identity-verifications/${id}`), staleTime: 0, refetchInterval: 4 * 60 * 1000 });
   if (q.isPending) return <Loading />;
   if (!q.data) return null;
   const r = q.data;
@@ -60,7 +60,7 @@ function Detail({ id, onDone }: { id: string; onDone: () => void }) {
             <p className="text-sm font-medium">{label}</p>
             {url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={url} alt={label ?? ""} className="w-full rounded border" />
+              <img src={url} alt={label ?? ""} className="w-full rounded border" onError={() => void q.refetch()} />
             ) : (
               <p className="text-sm text-muted-foreground">Không có ảnh</p>
             )}

@@ -74,7 +74,11 @@ export default function ExamPage() {
   const [busy, setBusy] = useState(false);
   const pending = useRef<{ sampleId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
 
+  // Chặn gọi "bắt đầu" hai lần cùng lúc (effect chạy lại / bấm thử lại khi đang tải).
+  const loading = useRef(false);
   const load = useCallback(async () => {
+    if (loading.current) return;
+    loading.current = true;
     setError(null);
     try {
       // 403 ngay sau khi tham gia: bản sao thành viên ở task-svc chưa tới — thử lại 2 lần (mục 8).
@@ -106,6 +110,8 @@ export default function ExamPage() {
       setIdx(firstBlank >= 0 ? firstBlank : 0);
     } catch (e) {
       setError(e);
+    } finally {
+      loading.current = false;
     }
   }, [id]);
 

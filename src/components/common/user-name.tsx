@@ -46,7 +46,14 @@ export function UserName({ id, withAvatar = false, fallback }: { id: string | nu
   const q = usePublicProfile(id);
   if (!id) return <span className="text-muted-foreground">{fallback ?? "—"}</span>;
   const name = q.data?.displayName ?? shortId(id);
-  if (!withAvatar) return <span title={id}>{name}</span>;
+  // Username thay cho userId khi cần nhận diện (mời, tra cứu): "Tên hiển thị @username".
+  const handle = q.data?.username ? <span className="text-xs text-muted-foreground">@{q.data.username}</span> : null;
+  if (!withAvatar)
+    return (
+      <span title={id}>
+        {name} {handle}
+      </span>
+    );
   return (
     <span className="inline-flex items-center gap-2" title={id}>
       <Avatar className="size-6">
@@ -54,6 +61,7 @@ export function UserName({ id, withAvatar = false, fallback }: { id: string | nu
         <AvatarFallback className="text-[10px]">{name.slice(0, 2).toUpperCase()}</AvatarFallback>
       </Avatar>
       <span>{name}</span>
+      {handle}
       {q.data && <span className="text-xs text-muted-foreground">cấp {q.data.level}</span>}
     </span>
   );

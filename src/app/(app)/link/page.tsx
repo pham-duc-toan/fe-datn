@@ -81,8 +81,12 @@ export default function LinksPage() {
                 <Field label="Alias (tuỳ chọn)" hint="3–32 ký tự A-Z 0-9 _ -">
                   <Input value={form.alias} onChange={(e) => setForm({ ...form, alias: e.target.value })} />
                 </Field>
-                <Field label="Mật khẩu (tuỳ chọn)">
-                  <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                <Field
+                  label="Mật khẩu (tuỳ chọn)"
+                  hint={form.password && (form.password.length < 4 || form.password.length > 100) ? undefined : "Từ 4 đến 100 ký tự"}
+                  error={form.password && (form.password.length < 4 || form.password.length > 100) ? `Mật khẩu phải từ 4 đến 100 ký tự (đang có ${form.password.length}).` : undefined}
+                >
+                  <Input type="password" maxLength={100} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Hết hạn">
@@ -106,7 +110,7 @@ export default function LinksPage() {
                 </div>
               </div>
               <Button
-                disabled={busy || !form.url.trim()}
+                disabled={busy || !form.url.trim() || (form.password !== "" && (form.password.length < 4 || form.password.length > 100))}
                 onClick={async () => {
                   setBusy(true);
                   try {

@@ -4,17 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Eye, FileCheck2, Loader2, LogOut, PlayCircle, Send, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, FileCheck2, Loader2, LogOut, PlayCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FreeTextNotice, hasFreeText } from "@/components/project/free-text-notice";
+import { ConsentBox } from "@/components/project/consent-box";
 import { PageHeader } from "@/components/common/page-header";
-import { KeyValue, Markdown, Field } from "@/components/common/misc";
+import { KeyValue, Markdown } from "@/components/common/misc";
 import { ActionDialog } from "@/components/common/action-dialog";
 import { StatusBadge } from "@/components/common/status-badge";
 import { ErrorState, Loading } from "@/components/common/states";
@@ -24,63 +23,6 @@ import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatVnd } from "@/lib/format";
 import { attemptState, genericStatus, MODALITY_LABEL, phaseOf, projectStatus, TOOL_LABEL, toolKindsText, VISIBILITY_LABEL } from "@/lib/labels";
 import type { JoinRequest, LevelInfo, Paged, ProjectListItem, Slots, Terms } from "@/lib/types";
-
-function ConsentBox({ projectId, terms, onDone }: { projectId: string; terms: Terms; onDone: () => void }) {
-  const [cw, setCw] = useState(false);
-  const [nda, setNda] = useState(false);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  return (
-    <Card className="border-amber-300">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ShieldAlert className="size-5 text-amber-600" /> Điều khoản của dự án
-        </CardTitle>
-        <CardDescription>Bạn cần đọc và đồng ý trước khi tham gia. Đồng ý được ghi lại cùng phiên bản văn bản.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {terms.sensitiveContent && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Cảnh báo nội dung</p>
-            <p className="rounded-md bg-muted p-3 text-sm whitespace-pre-wrap">{terms.contentWarning ?? "Dự án có nội dung nhạy cảm."}</p>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={cw} onCheckedChange={(c) => setCw(c === true)} /> Tôi đã đọc và chấp nhận xem nội dung này
-            </label>
-          </div>
-        )}
-        {terms.ndaRequired && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Thoả thuận bảo mật (NDA) — phiên bản {terms.ndaVersion}</p>
-            <div className="max-h-60 overflow-y-auto rounded-md bg-muted p-3 text-sm whitespace-pre-wrap">{terms.ndaText}</div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={nda} onCheckedChange={(c) => setNda(c === true)} /> Tôi đồng ý thoả thuận bảo mật
-            </label>
-            <Field label="Họ tên (chữ ký)">
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-          </div>
-        )}
-        <Button
-          disabled={busy || (terms.sensitiveContent && !cw) || (terms.ndaRequired && (!nda || !name.trim()))}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await post(`/projects/${projectId}/consent`, { acceptContentWarning: cw, acceptNda: nda, fullName: name.trim() || null });
-              toast.success("Đã ghi nhận đồng ý");
-              onDone();
-            } catch (e) {
-              toast.error(errorMessage(e));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {busy && <Loader2 className="animate-spin" />} Đồng ý
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
 
 export default function LabelerProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -138,7 +80,16 @@ export default function LabelerProjectPage() {
               <CardContent className="text-sm whitespace-pre-wrap">{p.description}</CardContent>
             </Card>
           )}
-          {needConsent && terms.data && <ConsentBox projectId={id} terms={terms.data} onDone={() => void qc.invalidateQueries({ queryKey: ["terms", id] })} />}
+          {needConsent && terms.data && (
+            <ConsentBox
+              terms={terms.data}
+              onSubmit={async (c) => {
+                await post(`/projects/${id}/consent`, c);
+                toast.success("Đã ghi nhận đồng ý");
+                void qc.invalidateQueries({ queryKey: ["terms", id] });
+              }}
+            />
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Hướng dẫn</CardTitle>
@@ -190,7 +141,8 @@ export default function LabelerProjectPage() {
                   ["Số câu", `${p.questionCount} câu`],
                   ["Dạng gán nhãn", toolKindsText(p.toolKinds) || "—"],
                   ["Điều kiện đạt", `Giống đa số ≥ ${p.passThresholdPercent}% và không sai câu kiểm tra`],
-                  ["Số suất", slots.data ? `${slots.data.available} / ${p.slots} còn trống (${slots.data.submitted} đã nộp)` : `${p.slots} suất`],
+                  ["Suất thưởng", `${p.slots} bài đạt nộp sớm nhất được thưởng`],
+                  ["Chỗ làm bài", slots.data ? `còn ${slots.data.available} / ${slots.data.maxParticipants || p.slots} (${slots.data.submitted} đã nộp)` : "—"],
                   ["Hạn chót", formatDateTime(p.deadline)],
                   ["Cấp độ tối thiểu", p.minLevel ?? "Không"],
                   ["Uy tín tối thiểu", p.minReputation ?? "Không"],
@@ -249,7 +201,7 @@ export default function LabelerProjectPage() {
                     if (!open)
                       return (
                         <Button className="w-full" disabled>
-                          <PlayCircle /> {slots.data && slots.data.available <= 0 ? "Đã hết suất" : "Dự án không nhận bài"}
+                          <PlayCircle /> {slots.data && slots.data.available <= 0 ? "Đã đủ người làm" : "Dự án không nhận bài"}
                         </Button>
                       );
                     return (

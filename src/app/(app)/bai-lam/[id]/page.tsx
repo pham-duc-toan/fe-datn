@@ -51,7 +51,7 @@ function ResultCard({ s, freeText }: { s: AttemptSummary; freeText: boolean }) {
             <Clock className="size-5 text-muted-foreground" /> Chờ chấm
           </CardTitle>
           <CardDescription>
-            Bài được chấm một lần khi dự án đóng thu bài (đủ suất, hết hạn chót hoặc chủ dự án kết thúc sớm). Bạn sẽ nhận thông báo kết quả.
+            Bài được chấm một lần khi dự án đóng thu bài (đủ người làm, hết hạn chót hoặc chủ dự án kết thúc sớm). Tiền thưởng trao cho các bài đạt nộp sớm nhất, mỗi suất một bài. Bạn sẽ nhận thông báo kết quả.
           </CardDescription>
         </CardHeader>
         {freeText && (
@@ -62,6 +62,8 @@ function ResultCard({ s, freeText }: { s: AttemptSummary; freeText: boolean }) {
       </Card>
     );
   const dat = s.finalPassed ?? s.passed;
+  // Đạt nhưng các suất thưởng đã trao cho bài nộp trước (bản cũ không có rewarded → coi như được thưởng).
+  const thuong = dat && s.rewarded !== false;
   return (
     <Card className={cn(dat ? "border-emerald-300" : "border-destructive/40")}>
       <CardHeader>
@@ -69,8 +71,15 @@ function ResultCard({ s, freeText }: { s: AttemptSummary; freeText: boolean }) {
           {dat ? <CheckCircle2 className="size-5 text-emerald-600" /> : <XCircle className="size-5 text-destructive" />}
           {dat ? "Bài đạt" : "Bài chưa đạt"}
           {s.passed === false && s.finalPassed === true && <ToneBadge tone="success">đạt sau khiếu nại</ToneBadge>}
+          {dat && !thuong && <ToneBadge tone="warning">hết suất thưởng</ToneBadge>}
         </CardTitle>
-        <CardDescription>{dat ? `Đã nhận thưởng ${formatVnd(s.rewardVnd)} vào ví.` : "Không nhận thưởng. Bạn có thể khiếu nại cả bài trong thời hạn."}</CardDescription>
+        <CardDescription>
+          {thuong
+            ? `Đã nhận thưởng ${formatVnd(s.rewardVnd)} vào ví.`
+            : dat
+              ? "Bài đạt nhưng các suất thưởng đã được trao cho những bài đạt nộp sớm hơn. Kết quả vẫn được tính vào uy tín của bạn."
+              : "Không nhận thưởng. Bạn có thể khiếu nại cả bài trong thời hạn."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <KeyValue

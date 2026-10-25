@@ -195,6 +195,7 @@ export const READINESS_LABEL: Record<string, string> = {
   chua_cau_hinh_gia: "Chưa cấu hình tiền thưởng / số suất / ngưỡng đạt",
   chua_co_du_lieu: "Chưa có dữ liệu",
   du_lieu_dang_xu_ly: "Dữ liệu đang xử lý",
+  video_dang_chuan_bi: "Video đang được chuẩn bị (mã hoá lại để gắn watermark) — chờ xong mới publish được",
   deadline_da_qua: "Hạn chót đã qua",
   thieu_cau_hoi_vang_cho_test: "Thiếu câu vàng cho bài test đầu vào",
   thuong_duoi_toi_thieu: "Tiền thưởng mỗi suất dưới mức tối thiểu",
@@ -208,9 +209,9 @@ export const READINESS_LABEL: Record<string, string> = {
 
 /** Cảnh báo ở checklist (không chặn publish). */
 export const READINESS_WARNING: Record<string, string> = {
-  khong_co_cau_vang_kiem_tra: "Chưa có câu vàng kiểm tra — luật “không sai câu vàng” sẽ không có tác dụng.",
   cham_cau_tra_loi_mo_lau:
     "Có câu trả lời mở: khi dự án kết thúc, hệ thống phải phân tích ngữ nghĩa từng câu nên chấm và trả công cho labeler lâu hơn các dạng khác.",
+  video_khong_xu_ly_duoc: "Có video hỏng, hệ thống không xử lý được — labeler có thể không xem được các video này (xem tab Dữ liệu).",
 };
 
 export const REPORT_REASON: Record<string, string> = {

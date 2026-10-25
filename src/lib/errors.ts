@@ -220,8 +220,11 @@ export function messageForCode(code: string): string | undefined {
 export function errorMessage(e: unknown): string {
   if (e instanceof ApiError) {
     const base = MESSAGES[e.code];
+    // Backend đã trả câu tiếng Việt có dấu (kèm chi tiết như giới hạn ký tự) → dùng luôn, đầy đủ hơn bản dịch tĩnh.
+    const vietBackend = Boolean(e.detail && /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(e.detail));
     let msg: string;
-    if (base && SHOW_DETAIL.has(e.code) && e.detail) msg = `${base} ${e.detail}`;
+    if (vietBackend) msg = e.detail!;
+    else if (base && SHOW_DETAIL.has(e.code) && e.detail) msg = `${base} ${e.detail}`;
     else if (base) msg = base;
     else if (e.status === 400 && e.data.errors && typeof e.data.errors === "object") {
       msg = Object.values(e.data.errors as Record<string, string[]>).flat().join(" ");

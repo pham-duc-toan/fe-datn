@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, PlayCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ConsentBox } from "@/components/project/consent-box";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/page-header";
 import { QueryState } from "@/components/common/states";
@@ -15,7 +18,7 @@ import { api, ApiError, del, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatVnd } from "@/lib/format";
 import { appealState, attemptState, genericStatus, MEMBER_ROLE, projectStatus } from "@/lib/labels";
-import type { AttemptSummary, Invitation, JoinRequest, Paged, ProjectListItem } from "@/lib/types";
+import type { AttemptSummary, Invitation, JoinRequest, Paged, ProjectListItem, Terms } from "@/lib/types";
 
 function KetQua({ a }: { a: AttemptSummary }) {
   if (a.state !== "submitted") return <span className="text-muted-foreground">—</span>;
@@ -25,7 +28,8 @@ function KetQua({ a }: { a: AttemptSummary }) {
     <span className="flex flex-wrap items-center gap-1.5">
       <ToneBadge tone={dat ? "success" : "danger"}>{dat ? "Đạt" : "Chưa đạt"}</ToneBadge>
       {a.agreementPercent !== null && <span className="text-xs text-muted-foreground">{a.agreementPercent}% / cần {a.passThresholdPercent}%</span>}
-      {dat && <span className="text-xs text-emerald-700">+{formatVnd(a.rewardVnd)}</span>}
+      {dat && a.rewarded !== false && <span className="text-xs text-emerald-700">+{formatVnd(a.rewardVnd)}</span>}
+      {dat && a.rewarded === false && <span className="text-xs text-amber-700">hết suất thưởng</span>}
     </span>
   );
 }
@@ -36,6 +40,13 @@ export default function MyWorkPage() {
   const invites = useQuery({ queryKey: ["invitations", "mine"], queryFn: () => api<Invitation[]>("/projects/invitations/mine") });
   const reqs = useQuery({ queryKey: ["join-requests", "mine"], queryFn: () => api<JoinRequest[]>("/projects/join-requests/mine") });
   const projects = useQuery({ queryKey: ["projects", "mine-ids"], queryFn: () => api<Paged<ProjectListItem>>("/projects", { query: { mine: true, pageSize: 100 } }) });
+  // Lời mời vào dự án có cảnh báo / NDA: đọc và đồng ý ngay tại đây (dự án riêng tư chưa mở được trang dự án).
+  const [consentFor, setConsentFor] = useState<Invitation | null>(null);
+  const terms = useQuery({
+    queryKey: ["terms", consentFor?.projectId],
+    queryFn: () => api<Terms>(`/projects/${consentFor!.projectId}/terms`),
+    enabled: Boolean(consentFor),
+  });
 
   const act = async (fn: () => Promise<unknown>, ok: string, keys: string[][]) => {
     try {
@@ -50,6 +61,28 @@ export default function MyWorkPage() {
 
   return (
     <>
+      <Dialog open={Boolean(consentFor)} onOpenChange={(o) => !o && setConsentFor(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Tham gia “{consentFor?.projectName}”</DialogTitle>
+          </DialogHeader>
+          {terms.data && consentFor && (
+            <ConsentBox
+              terms={terms.data}
+              submitLabel="Đồng ý và chấp nhận lời mời"
+              onSubmit={async (c) => {
+                if (!terms.data.myConsentValid) await post(`/projects/${consentFor.projectId}/consent`, c);
+                await post(`/projects/invitations/${consentFor.invitationId}/accept`);
+                toast.success("Đã vào dự án");
+                setConsentFor(null);
+                void qc.invalidateQueries({ queryKey: ["invitations", "mine"] });
+                void qc.invalidateQueries({ queryKey: ["projects", "mine-ids"] });
+              }}
+            />
+          )}
+          {terms.error && <p className="text-sm text-destructive">{errorMessage(terms.error)}</p>}
+        </DialogContent>
+      </Dialog>
       <PageHeader title="Bài làm của tôi" description="Mỗi dự án bạn làm một bài (cả dự án), nộp một lần, được chấm khi dự án đóng thu bài." />
       <div className="space-y-6">
         <Card>
@@ -131,12 +164,14 @@ export default function MyWorkPage() {
                         </div>
                       </div>
                       <div className="flex gap-1.5">
-                        {i.requiresConsent && (
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/cho/${i.projectId}`}>Đọc điều khoản</Link>
-                          </Button>
-                        )}
-                        <Button size="sm" onClick={() => void act(() => post(`/projects/invitations/${i.invitationId}/accept`), "Đã vào dự án", [["invitations", "mine"], ["projects", "mine-ids"]])}>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            i.requiresConsent
+                              ? setConsentFor(i)
+                              : void act(() => post(`/projects/invitations/${i.invitationId}/accept`), "Đã vào dự án", [["invitations", "mine"], ["projects", "mine-ids"]])
+                          }
+                        >
                           <Check /> Chấp nhận
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => void act(() => post(`/projects/invitations/${i.invitationId}/decline`), "Đã từ chối", [["invitations", "mine"]])}>

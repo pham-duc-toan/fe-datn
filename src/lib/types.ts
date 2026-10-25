@@ -10,6 +10,7 @@ export type Me = { userId: string; email: string | null; roles: Role[]; name: st
 export type Profile = {
   userId: string;
   email: string;
+  username: string;
   emailVerified: boolean;
   displayName: string;
   bio: string | null;
@@ -27,7 +28,7 @@ export type LevelInfo = {
   nextLevel: { level: number; minApproved: number; minReputation: number } | null;
   badges: Badge[];
 };
-export type PublicProfile = { userId: string; displayName: string; avatarUrl: string | null; level: number; badges: Badge[] };
+export type PublicProfile = { userId: string; username: string; displayName: string; avatarUrl: string | null; level: number; badges: Badge[] };
 
 export type TokenResponse = { accessToken: string; refreshToken: string; tokenType: string; expiresIn: number };
 export type TwoFactorChallenge = { twoFactorRequired: true; challengeToken: string; expiresIn: number };
@@ -174,6 +175,8 @@ export type ProjectLimits = {
   passThresholdMax: number;
   minSlots: number;
   maxSlots: number;
+  /** Trần người làm bài = số suất × hệ số này (setting admin). */
+  participantMultiplier: number;
   maxQuestions: number;
   minRewardVnd: number;
 };
@@ -183,6 +186,10 @@ export type Readiness = {
   missing: string[];
   warnings: string[];
   sampleCount: number;
+  /** Số file video media-svc đang chuẩn bị (chặn publish / duyệt). */
+  videoPreparingCount: number;
+  /** Số file video hỏng, không chuẩn bị được (chỉ cảnh báo). */
+  videoFailedCount: number;
   questionCount: number;
   qualityGoldCount: number;
   entranceGoldCount: number;
@@ -212,6 +219,9 @@ export type Sample = {
   fileUrl: string | null;
   content: SampleContent | null;
   metadata: SampleMeta;
+  /** Video: chuẩn bị bản chuẩn để gắn watermark. null = không cần. */
+  mediaState?: "preparing" | "ready" | "failed" | null;
+  mediaError?: string | null;
 };
 
 export type GoldItem = { id: string; sampleId: string; expectedPayload: LabelPayload; purpose: "entranceTest" | "qualityCheck" };
@@ -336,6 +346,8 @@ export type AttemptSummary = {
   goldCorrect: number | null;
   passed: boolean | null;
   finalPassed: boolean | null;
+  /** Được trả thưởng (trong n suất — n bài đạt nộp sớm nhất). Đạt mà false = hết suất thưởng. */
+  rewarded?: boolean | null;
   gradedAt: string | null;
   appealState: AppealState;
   appealMessage: string | null;
@@ -351,7 +363,10 @@ export type ProjectPhase = "open" | "finished" | "graded" | "settled";
 
 export type Slots = {
   projectId: string;
+  /** Số suất THƯỞNG: n bài đạt nộp sớm nhất được thưởng. */
   slots: number;
+  /** Trần người làm bài — available = maxParticipants − đang làm − đã nộp. */
+  maxParticipants: number;
   inProgress: number;
   submitted: number;
   available: number;
@@ -389,6 +404,8 @@ export type Annotation = {
 export type Progress = {
   projectId: string;
   slots: number;
+  /** Trần người làm bài (0 ở bản chụp cũ → dùng slots). */
+  maxParticipants?: number;
   questionCount: number;
   inProgress: number;
   submitted: number;

@@ -35,7 +35,7 @@ function ProjectCard({ p }: { p: ProjectListItem }) {
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs">
             <span className="flex items-center gap-1" title="Số câu của bài"><ListOrdered className="size-3.5 text-muted-foreground" /> {p.questionCount} câu</span>
-            <span className="flex items-center gap-1" title="Số suất (bài đạt được thưởng)"><Users className="size-3.5 text-muted-foreground" /> {p.slots} suất</span>
+            <span className="flex items-center gap-1" title="Số suất thưởng: số bài đạt nộp sớm nhất được thưởng"><Users className="size-3.5 text-muted-foreground" /> {p.slots} suất</span>
             <span className="flex items-center gap-1" title="Tỉ lệ câu giống đa số tối thiểu"><Target className="size-3.5 text-muted-foreground" /> đạt ≥ {p.passThresholdPercent}%</span>
           </div>
           {p.toolKinds.length > 0 && <p className="text-xs text-muted-foreground">Dạng gán nhãn: {toolKindsText(p.toolKinds)}</p>}

@@ -46,7 +46,13 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
   const qc = useQueryClient();
   const setProject = useSetProject(p.id);
   const published = !["draft", "pendingEscrow"].includes(p.status) || p.publishedAt;
-  const readiness = useQuery({ queryKey: ["readiness", p.id], queryFn: () => api<Readiness>(`/projects/${p.id}/readiness`), enabled: p.status === "draft" });
+  const readiness = useQuery({
+    queryKey: ["readiness", p.id],
+    queryFn: () => api<Readiness>(`/projects/${p.id}/readiness`),
+    enabled: p.status === "draft",
+    // Video đang chuẩn bị: tự cập nhật checklist tới khi xong.
+    refetchInterval: (q) => ((q.state.data?.videoPreparingCount ?? 0) > 0 ? 5000 : false),
+  });
   const kyb = useQuery({ queryKey: ["kyb"], queryFn: () => api<KybProfile>("/kyb/me"), enabled: p.status === "draft" });
   const progress = useQuery({ queryKey: ["progress", p.id], queryFn: () => api<ProgressT>(`/tasks/projects/${p.id}/progress`), enabled: Boolean(published), refetchInterval: 20000 });
   // Bài đạt (kể cả khiếu nại được chấp nhận) — có ngay khi chấm xong, trước khi dự án chốt.
@@ -99,7 +105,9 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
   }
 
   const pr = progress.data;
-  const done = pr ? Math.round((pr.submitted / Math.max(1, pr.slots)) * 100) : 0;
+  // Trần người làm (bản chụp cũ không có → số suất).
+  const cap = pr ? pr.maxParticipants || pr.slots : 0;
+  const done = pr ? Math.round((pr.submitted / Math.max(1, cap)) * 100) : 0;
   const r = readiness.data;
 
   return (
@@ -157,6 +165,7 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
                     {r.missing.map((m) => (
                       <li key={m} className="flex items-center gap-2 text-sm">
                         <XOctagon className="size-4 text-destructive" /> {READINESS_LABEL[m] ?? m}
+                        {m === "video_dang_chuan_bi" && <span className="text-muted-foreground">({formatNumber(r.videoPreparingCount)} video)</span>}
                       </li>
                     ))}
                   </ul>
@@ -189,7 +198,7 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
         <>
           {hasFreeText(p.toolKinds) && !pr?.gradedAt && <FreeTextNotice audience={pr?.phase === "finished" ? "pending" : "business"} />}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Bài đã nộp" value={pr ? `${pr.submitted}/${pr.slots}` : "—"} hint={pr ? `${done}% số suất` : undefined} />
+            <StatCard label="Bài đã nộp" value={pr ? `${pr.submitted}/${cap}` : "—"} hint={pr ? `${done}% trần người làm · ${pr.slots} suất thưởng` : undefined} />
             <StatCard label="Đang làm" value={pr?.inProgress ?? "—"} hint={pr ? `${pr.expired} hết giờ · ${pr.cancelled} bỏ` : undefined} />
             <StatCard
               label="Giai đoạn"

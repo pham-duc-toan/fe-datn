@@ -75,14 +75,14 @@ export function KeyValue({ items, className }: { items: [ReactNode, ReactNode][]
   );
 }
 
-export function Field({ label, hint, children, required, className }: { label: ReactNode; hint?: ReactNode; children: ReactNode; required?: boolean; className?: string }) {
+export function Field({ label, hint, error, children, required, className }: { label: ReactNode; hint?: ReactNode; error?: ReactNode; children: ReactNode; required?: boolean; className?: string }) {
   return (
     <div className={cn("space-y-1.5", className)}>
       <label className="text-sm font-medium">
         {label} {required && <span className="text-destructive">*</span>}
       </label>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {error ? <p className="text-xs text-destructive">{error}</p> : hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

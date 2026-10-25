@@ -30,18 +30,24 @@ const TABS = [
   ["bao-loi", "Câu bị báo lỗi"],
 ] as const;
 
+/** Chỉ có dữ liệu sau khi dự án được duyệt (đã chạy) — trước đó ẩn đi. */
+const AFTER_APPROVAL = new Set(["ket-qua", "chat-luong", "bao-loi"]);
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const params = useSearchParams();
-  const tab = params.get("tab") ?? "tong-quan";
   const q = useProject(id);
 
   if (q.isPending) return <Loading />;
   if (q.error) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   const p = q.data!;
   const setTab = (t: string) => router.replace(`/du-an/${id}?tab=${t}`, { scroll: false });
-  const published = p.status !== "draft";
+  // Đã được admin duyệt (publishedAt có từ lúc duyệt) — mới có bài nộp, chất lượng, câu bị báo lỗi.
+  const approved = Boolean(p.publishedAt) || ["running", "paused", "grading", "completed"].includes(p.status);
+  const tabs = TABS.filter(([k]) => approved || !AFTER_APPROVAL.has(k));
+  const asked = params.get("tab") ?? "tong-quan";
+  const tab = tabs.some(([k]) => k === asked) ? asked : "tong-quan";
 
   return (
     <>
@@ -54,7 +60,7 @@ export default function ProjectDetailPage() {
         }
         description={`${MODALITY_LABEL[p.modality]} · ${VISIBILITY_LABEL[p.visibility]}${p.description ? ` · ${p.description}` : ""}`}
         actions={
-          published && (
+          approved && (
             <Button variant="outline" onClick={() => setTab("ket-qua")}>
               <ClipboardCheck /> Xem kết quả
             </Button>
@@ -68,7 +74,7 @@ export default function ProjectDetailPage() {
       ) : (
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="h-auto flex-wrap">
-            {TABS.map(([k, label]) => (
+            {tabs.map(([k, label]) => (
               <TabsTrigger key={k} value={k}>
                 {label}
               </TabsTrigger>
@@ -90,15 +96,19 @@ export default function ProjectDetailPage() {
             <TabsContent value="thanh-vien">
               <MembersTab project={p} />
             </TabsContent>
-            <TabsContent value="ket-qua">
-              <ResultsTab project={p} />
-            </TabsContent>
-            <TabsContent value="chat-luong">
-              <QualityTab project={p} />
-            </TabsContent>
-            <TabsContent value="bao-loi">
-              <ReportsTab project={p} />
-            </TabsContent>
+            {approved && (
+              <>
+                <TabsContent value="ket-qua">
+                  <ResultsTab project={p} />
+                </TabsContent>
+                <TabsContent value="chat-luong">
+                  <QualityTab project={p} />
+                </TabsContent>
+                <TabsContent value="bao-loi">
+                  <ReportsTab project={p} />
+                </TabsContent>
+              </>
+            )}
           </div>
         </Tabs>
       )}

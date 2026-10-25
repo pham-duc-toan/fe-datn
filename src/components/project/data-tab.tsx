@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
 import { api, post } from "@/lib/api";
+import { autoBatchName } from "@/lib/tool-names";
 import { uploadToSignedUrl } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatBytes, formatDateTime } from "@/lib/format";
@@ -57,8 +58,13 @@ export function DataTab({ project: p }: { project: Project }) {
     refetchInterval: (q) => ((q.state.data ?? []).some((d) => d.status === "pending" || d.status === "ingesting") ? 2000 : false),
   });
   const [page, setPage] = useUrlPage();
-  const samples = useQuery({ queryKey: ["samples", p.id, page], queryFn: () => api<Paged<Sample>>(`/projects/${p.id}/samples`, { query: { page, pageSize: 24 } }) });
-  const [name, setName] = useState(`lo-${new Date().toISOString().slice(0, 10)}`);
+  const samples = useQuery({
+    queryKey: ["samples", p.id, page],
+    queryFn: () => api<Paged<Sample>>(`/projects/${p.id}/samples`, { query: { page, pageSize: 24 } }),
+    refetchInterval: (q) => ((q.state.data?.items ?? []).some((x) => x.mediaState === "preparing") ? 5000 : false),
+  });
+  // Tên lô tự sinh = tên dự án + ngày giờ nạp — doanh nghiệp không phải đặt.
+  const name = autoBatchName(p.name);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [rows, setRows] = useState("");
@@ -145,9 +151,6 @@ export function DataTab({ project: p }: { project: Project }) {
             <CardDescription>Mỗi mẫu thành một câu trong bài của labeler khi dự án chạy. Dòng sai bị bỏ qua, không làm hỏng cả lô.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Field label="Tên lô" className="max-w-sm">
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
             <Tabs defaultValue={isFile ? "files" : "rows"}>
               <TabsList className="flex-wrap">
                 {isFile && <TabsTrigger value="files">Tải file lên</TabsTrigger>}
@@ -312,6 +315,12 @@ export function DataTab({ project: p }: { project: Project }) {
                       <p className="text-[10px] text-muted-foreground">
                         {s.metadata.width ? `${s.metadata.width}×${s.metadata.height}` : s.metadata.durationSec ? `${s.metadata.durationSec}s` : ""} {formatBytes(s.sizeBytes)}
                       </p>
+                      {s.mediaState === "preparing" && <p className="text-[10px] text-amber-600">Đang chuẩn bị video…</p>}
+                      {s.mediaState === "failed" && (
+                        <p className="text-[10px] text-destructive" title={s.mediaError ?? undefined}>
+                          Video hỏng, không xử lý được
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

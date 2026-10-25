@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Save, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ function toLocal(iso: string | null): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function SaveCard({ title, description, children, onSave, disabled, note }: { title: string; description?: ReactNode; children: ReactNode; onSave: () => Promise<Project>; disabled?: boolean; note?: ReactNode }) {
+function SaveCard({ title, description, children, onSave, disabled, note }: { title: string; description?: ReactNode; children: ReactNode; onSave: () => Promise<unknown>; disabled?: boolean; note?: ReactNode }) {
   const [busy, setBusy] = useState(false);
   return (
     <Card>
@@ -67,6 +67,7 @@ function SaveCard({ title, description, children, onSave, disabled, note }: { ti
 
 export function ConfigTab({ project: p }: { project: Project }) {
   const setProject = useSetProject(p.id);
+  const qc = useQueryClient();
   const draft = p.status === "draft";
   const save = async (path: string, body: unknown) => {
     const r = await put<Project>(`/projects/${p.id}${path}`, body);
@@ -133,7 +134,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
       </SaveCard>
 
       <SaveCard title="Tập nhãn" description="Mỗi công cụ là một câu hỏi trên màn hình gán nhãn, theo đúng thứ tự." onSave={() => save("/label-schema", { ...schema, modality: p.modality })} disabled={!draft}>
-        <SchemaEditor modality={p.modality} value={schema} onChange={setSchema} />
+        <SchemaEditor modality={p.modality} value={schema} onChange={setSchema} projectName={name} />
       </SaveCard>
 
       <SaveCard title="Hướng dẫn gán nhãn" description="Markdown; hiển thị cho labeler trước khi làm. Ví dụ đúng / sai giúp labeler hiểu nhanh." onSave={() => save("/guideline", guide)} disabled={!draft}>
@@ -174,7 +175,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
 
       <SaveCard
         title="Tiền thưởng, số suất, ngưỡng đạt"
-        description="Tiền tính cho CẢ DỰ ÁN: mỗi labeler làm hết các câu rồi nộp một bài. Bài đạt (giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra) nhận trọn tiền thưởng sau khi dự án chấm xong."
+        description="Tiền tính cho CẢ DỰ ÁN: mỗi labeler làm hết các câu rồi nộp một bài. Bài đạt = giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra. Mỗi suất thưởng trao cho một bài đạt, theo thứ tự nộp sớm nhất; số người được làm nhiều hơn số suất để đa số chắc hơn."
         disabled={!draft}
         onSave={() =>
           save("/pricing", {
@@ -190,7 +191,9 @@ export function ConfigTab({ project: p }: { project: Project }) {
               Phí nền tảng {feePct}% mỗi bài đạt: <b>{formatVnd(feePerPass)}</b>. Ký quỹ = {slots || "…"} suất × ({formatVnd(reward)} + {formatVnd(feePerPass)})
               {gateBudget > 0 && <> + ngân sách cổng link {formatVnd(gateBudget)}</>} = <b>{formatVnd(slots * (reward + feePerPass) + gateBudget)}</b>.
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">Suất không có bài đạt được hoàn về ví khi dự án kết thúc. Số câu hiện tại: {rdy.data?.questionCount ?? p.questionCount} câu.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ký quỹ chỉ tính theo số suất thưởng — người làm thêm không tốn tiền. Suất không có bài đạt được hoàn về ví khi dự án kết thúc. Số câu hiện tại: {rdy.data?.questionCount ?? p.questionCount} câu.
+            </p>
           </div>
         }
       >
@@ -198,7 +201,14 @@ export function ConfigTab({ project: p }: { project: Project }) {
           <Field label="Tiền thưởng mỗi suất (đ)" hint={lim ? `Tối thiểu ${formatVnd(lim.minRewardVnd)} — cho cả bài, không theo câu` : "Cho cả bài, không theo câu"}>
             <Input type="number" min={0} value={price.rewardVnd} onChange={(e) => setPrice({ ...price, rewardVnd: e.target.value })} />
           </Field>
-          <Field label="Số suất" hint={lim ? `${lim.minSlots}–${lim.maxSlots} người được thưởng` : "Số bài đạt tối đa được thưởng"}>
+          <Field
+            label="Số suất thưởng"
+            hint={
+              lim
+                ? `${lim.minSlots}–${lim.maxSlots} người được thưởng (n bài đạt nộp sớm nhất). Tối đa ${slots ? slots * lim.participantMultiplier : `n × ${lim.participantMultiplier}`} người được làm bài.`
+                : "Số bài đạt nộp sớm nhất được thưởng"
+            }
+          >
             <Input type="number" min={lim?.minSlots ?? 1} max={lim?.maxSlots ?? 50} value={price.slots} onChange={(e) => setPrice({ ...price, slots: e.target.value })} />
           </Field>
           <Field label="Hạn chót">
@@ -308,7 +318,13 @@ export function ConfigTab({ project: p }: { project: Project }) {
         title="Bảo vệ nội dung & NDA"
         description="Dự án nhạy cảm chỉ nhận người đã xác minh danh tính và đủ tuổi, phải đồng ý cảnh báo trước; mẫu được che cho tới khi bấm hiện."
         disabled={!draft}
-        onSave={() => save("/protection", { ...prot, contentWarning: prot.contentWarning || null, ndaText: prot.ndaRequired ? prot.ndaText || null : null })}
+        onSave={async () => {
+          // /protection trả về điều khoản (không phải dự án) — tải lại dự án thay vì ghi đè.
+          await put(`/projects/${p.id}/protection`, { ...prot, contentWarning: prot.contentWarning || null, ndaText: prot.ndaRequired ? prot.ndaText || null : null });
+          await qc.invalidateQueries({ queryKey: ["project", p.id] });
+          void qc.invalidateQueries({ queryKey: ["readiness", p.id] });
+          void qc.invalidateQueries({ queryKey: ["terms", p.id] });
+        }}
       >
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={prot.sensitiveContent} onCheckedChange={(v) => setProt({ ...prot, sensitiveContent: v })} /> Nội dung nhạy cảm

@@ -22,7 +22,7 @@ import { genericStatus, kybStatus, ROLE_LABEL } from "@/lib/labels";
 import type { Paged } from "@/lib/types";
 import { useUrlPage, useUrlState } from "@/lib/use-url-state";
 
-type U = { userId: string; email: string; displayName: string; roles: string[]; status: string; blockedAt: string | null; blockedReason: string | null; kybStatus: string | null; createdAt: string };
+type U = { userId: string; email: string; username?: string; displayName: string; roles: string[]; status: string; blockedAt: string | null; blockedReason: string | null; kybStatus: string | null; createdAt: string };
 
 export default function AdminUsersPage() {
   const qc = useQueryClient();
@@ -95,7 +95,7 @@ export default function AdminUsersPage() {
                     {d.items.map((u) => (
                       <TableRow key={u.userId}>
                         <TableCell className="pl-4">
-                          <div className="font-medium">{u.displayName}</div>
+                          <div className="font-medium">{u.displayName} {u.username && <span className="text-xs font-normal text-muted-foreground">@{u.username}</span>}</div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             {u.email} <CopyButton value={u.userId} />
                           </div>

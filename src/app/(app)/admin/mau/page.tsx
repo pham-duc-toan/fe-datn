@@ -105,7 +105,7 @@ export default function TemplatesAdminPage() {
                 <Input type="number" value={form.redundancy} onChange={(e) => setForm({ ...form, redundancy: e.target.value })} />
               </Field>
             </div>
-            <SchemaEditor modality={form.modality} value={form.schema} onChange={(s) => setForm({ ...form, schema: s })} />
+            <SchemaEditor modality={form.modality} value={form.schema} onChange={(s) => setForm({ ...form, schema: s })} projectName={form.name} />
             <Field label="Hướng dẫn (markdown)">
               <Textarea rows={6} className="font-mono text-sm" value={form.guideline} onChange={(e) => setForm({ ...form, guideline: e.target.value })} />
             </Field>

@@ -14,6 +14,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { api, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import type { Role } from "@/lib/types";
+import { suggestUsername, usernameError } from "@/lib/tool-names";
 
 const ROLE_OPTIONS: { value: Role; label: string; hint: string }[] = [
   { value: "labeler", label: "Người gán nhãn", hint: "Làm bài gán nhãn theo dự án, chia sẻ link rút gọn để kiếm thu nhập" },
@@ -30,6 +31,11 @@ export default function RegisterPage() {
   const [email, setEmail] = useState(invitedEmail ?? "");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  // Username không trùng — dùng để được mời vào dự án và đăng nhập thay email. Gợi ý từ email tới khi tự sửa.
+  const [username, setUsername] = useState("");
+  const [usernameTouched, setUsernameTouched] = useState(false);
+  const shownUsername = usernameTouched ? username : suggestUsername(email);
+  const usernameErr = shownUsername ? usernameError(shownUsername) : null;
   const [roles, setRoles] = useState<Role[]>(["labeler"]);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -46,7 +52,7 @@ export default function RegisterPage() {
     setError(null);
     setFieldErrors({});
     try {
-      await api("/auth/register", { method: "POST", auth: false, body: { email: email.trim(), password, displayName: name.trim(), roles } });
+      await api("/auth/register", { method: "POST", auth: false, body: { email: email.trim(), username: shownUsername.trim().replace(/^@/, ""), password, displayName: name.trim(), roles } });
       // Đăng nhập luôn để nhập mã giới thiệu; lời mời dự án tự gắn khi xác thực email (mục 17.5).
       const ch = await login(email.trim(), password);
       if (!ch) {
@@ -105,6 +111,23 @@ export default function RegisterPage() {
           <Field label="Email" required hint={fieldErrors.email?.join(" ")}>
             <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} readOnly={Boolean(invitedEmail)} />
           </Field>
+          <Field
+            label="Username"
+            required
+            error={fieldErrors.username?.join(" ") || (usernameTouched && usernameErr) || undefined}
+            hint="Tên đăng nhập không trùng (3–30 ký tự: a-z, 0-9, dấu chấm, gạch dưới). Doanh nghiệp mời bạn vào dự án bằng tên này."
+          >
+            <Input
+              required
+              maxLength={31}
+              value={shownUsername}
+              placeholder="nguyenvana"
+              onChange={(e) => {
+                setUsernameTouched(true);
+                setUsername(e.target.value.toLowerCase());
+              }}
+            />
+          </Field>
           <Field label="Tên hiển thị" required hint={fieldErrors.displayName?.join(" ")}>
             <Input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
@@ -127,7 +150,7 @@ export default function RegisterPage() {
             ))}
           </div>
           {ref && <p className="text-xs text-muted-foreground">Mã giới thiệu: <b>{ref}</b> — sẽ được áp dụng sau khi đăng ký.</p>}
-          <Button type="submit" className="w-full" disabled={busy || roles.length === 0}>
+          <Button type="submit" className="w-full" disabled={busy || roles.length === 0 || Boolean(usernameErr) || !shownUsername}>
             {busy && <Loader2 className="animate-spin" />} Đăng ký
           </Button>
           <p className="text-center text-sm">

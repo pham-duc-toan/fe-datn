@@ -11,6 +11,8 @@ import { Field } from "@/components/common/misc";
 import { FreeTextNotice } from "@/components/project/free-text-notice";
 import type { AttributeDef, LabelSchema, Modality, Tool, ToolKind } from "@/lib/types";
 import { CLASS_TOOLS, LIST_TOOLS, TOOL_LABEL, TOOLS_BY_MODALITY } from "@/lib/labels";
+import { autoToolName } from "@/lib/tool-names";
+import { TOOL_GUIDE, ToolGuideDialog } from "@/components/project/tool-guide";
 
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
 const parseClasses = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
@@ -58,7 +60,7 @@ function AttributeEditor({ attrs, onChange }: { attrs: AttributeDef[]; onChange:
   );
 }
 
-function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool: Tool; modality: Modality; all: Tool[]; onChange: (t: Tool) => void; onRemove: () => void; onMove: (d: -1 | 1) => void }) {
+function ToolEditor({ tool, index, projectName, modality, all, onChange, onRemove, onMove }: { tool: Tool; index: number; projectName: string; modality: Modality; all: Tool[]; onChange: (t: Tool) => void; onRemove: () => void; onMove: (d: -1 | 1) => void }) {
   const [classText, setClassText] = useState((tool.classes ?? []).join("\n"));
   const set = (patch: Partial<Tool>) => onChange({ ...tool, ...patch });
   const hasClasses = CLASS_TOOLS.includes(tool.kind);
@@ -66,11 +68,20 @@ function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool:
   return (
     <div className="space-y-3 rounded-lg border p-3">
       <div className="flex flex-wrap items-end gap-2">
-        <Field label="Tên (khoá)" hint="a-z, 0-9, _" className="w-44">
-          <Input className="h-8" value={tool.name} onChange={(e) => set({ name: e.target.value })} />
-        </Field>
+        <span className="flex h-8 items-center text-sm font-medium text-muted-foreground">Câu {index + 1}</span>
         <Field label="Loại công cụ" className="w-56">
-          <Select value={tool.kind} onValueChange={(v) => onChange({ name: tool.name, kind: v as ToolKind, required: tool.required, classes: CLASS_TOOLS.includes(v as ToolKind) ? tool.classes ?? ["lop_1", "lop_2"] : undefined })}>
+          <Select
+            value={tool.kind}
+            onValueChange={(v) =>
+              onChange({
+                // Khoá tự sinh theo tên dự án + loại công cụ (không bắt doanh nghiệp đặt tên).
+                name: autoToolName(projectName, v as ToolKind, all.filter((t) => t !== tool)),
+                kind: v as ToolKind,
+                required: tool.required,
+                classes: CLASS_TOOLS.includes(v as ToolKind) ? tool.classes ?? ["lop_1", "lop_2"] : undefined,
+              })
+            }
+          >
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -83,7 +94,7 @@ function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool:
             </SelectContent>
           </Select>
         </Field>
-        <label className="flex h-8 items-center gap-1.5 text-sm">
+        <label className="flex h-8 items-center gap-1.5 text-sm" title="Bật thì labeler phải trả lời câu này mới nộp được bài">
           <Checkbox checked={tool.required !== false} onCheckedChange={(c) => set({ required: c === true })} /> Bắt buộc
         </label>
         <div className="ml-auto flex gap-1">
@@ -98,8 +109,14 @@ function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool:
           </Button>
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        {TOOL_GUIDE[tool.kind].what} <span className="italic">Ví dụ: {TOOL_GUIDE[tool.kind].example}</span>
+      </p>
       {hasClasses && (
-        <Field label="Các lớp" hint={tool.kind === "classification" ? "Mỗi dòng một lớp, ≥ 2 lớp" : "Mỗi dòng một lớp"}>
+        <Field
+          label="Các lớp"
+          hint={tool.kind === "classification" ? "Nhãn labeler được chọn — mỗi dòng một lớp, ít nhất 2 lớp. Vd: ô tô / xe máy / xe đạp" : "Nhãn gắn cho mỗi đối tượng labeler vẽ / bôi — mỗi dòng một lớp"}
+        >
           <Textarea
             rows={3}
             value={classText}
@@ -130,22 +147,22 @@ function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool:
       <div className="flex flex-wrap gap-3">
         {isListTool && (
           <>
-            <Field label="Tối thiểu" className="w-24">
+            <Field label="Tối thiểu" hint="Số đối tượng ít nhất" className="w-28">
               <Input className="h-8" type="number" value={tool.minItems ?? ""} onChange={(e) => set({ minItems: numOrNull(e.target.value) ?? undefined })} />
             </Field>
-            <Field label="Tối đa" className="w-24">
+            <Field label="Tối đa" hint="Trống = không giới hạn" className="w-28">
               <Input className="h-8" type="number" value={tool.maxItems ?? ""} onChange={(e) => set({ maxItems: numOrNull(e.target.value) ?? undefined })} />
             </Field>
           </>
         )}
         {tool.kind === "freeText" && <FreeTextNotice audience="business" className="basis-full" />}
         {(tool.kind === "transcription" || tool.kind === "freeText") && (
-          <Field label="Độ dài tối đa" className="w-32">
+          <Field label="Độ dài tối đa" hint="Số ký tự" className="w-32">
             <Input className="h-8" type="number" value={tool.maxLength ?? ""} onChange={(e) => set({ maxLength: numOrNull(e.target.value) ?? undefined })} />
           </Field>
         )}
         {!["classification", "pairwise", "freeText", "number"].includes(tool.kind) && (
-          <Field label="Ngưỡng khớp (0–1)" hint="Trống = mặc định" className="w-36">
+          <Field label="Ngưỡng khớp (0–1)" hint={`Giống tới mức nào thì tính là giống đa số. Trống = mặc định. ${TOOL_GUIDE[tool.kind].grading}`} className="w-72">
             <Input className="h-8" type="number" step="0.05" value={tool.matchThreshold ?? ""} onChange={(e) => set({ matchThreshold: numOrNull(e.target.value) })} />
           </Field>
         )}
@@ -157,7 +174,7 @@ function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool:
             <Field label="Lớn nhất" className="w-24">
               <Input className="h-8" type="number" value={tool.max ?? ""} onChange={(e) => set({ max: numOrNull(e.target.value) })} />
             </Field>
-            <Field label="Lệch cho phép" className="w-28">
+            <Field label="Lệch cho phép" hint="Chênh vẫn tính là giống" className="w-32">
               <Input className="h-8" type="number" value={tool.tolerance ?? ""} onChange={(e) => set({ tolerance: numOrNull(e.target.value) ?? undefined })} />
             </Field>
             <label className="flex items-center gap-1.5 self-end pb-1.5 text-sm">
@@ -166,15 +183,15 @@ function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool:
           </>
         )}
         {tool.kind === "relation" && (
-          <Field label="Công cụ đoạn (span) gốc" className="w-56">
+          <Field label="Công cụ đoạn (span) gốc" hint="Quan hệ nối các đoạn của công cụ này" className="w-56">
             <Select value={tool.spanTool ?? ""} onValueChange={(v) => set({ spanTool: v })}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Chọn công cụ span" />
               </SelectTrigger>
               <SelectContent>
-                {all.filter((t) => t.kind === "span").map((t) => (
+                {all.map((t, k) => ({ t, k })).filter(({ t }) => t.kind === "span").map(({ t, k }) => (
                   <SelectItem key={t.name} value={t.name}>
-                    {t.name}
+                    Câu {k + 1}: {TOOL_LABEL[t.kind]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -187,7 +204,7 @@ function ToolEditor({ tool, modality, all, onChange, onRemove, onMove }: { tool:
   );
 }
 
-export function SchemaEditor({ modality, value, onChange }: { modality: Modality; value: LabelSchema; onChange: (s: LabelSchema) => void }) {
+export function SchemaEditor({ modality, value, onChange, projectName = "" }: { modality: Modality; value: LabelSchema; onChange: (s: LabelSchema) => void; projectName?: string }) {
   const [json, setJson] = useState<string | null>(null);
   const [jsonErr, setJsonErr] = useState<string | null>(null);
   const tools = value.tools;
@@ -225,7 +242,7 @@ export function SchemaEditor({ modality, value, onChange }: { modality: Modality
   return (
     <div className="space-y-3">
       {(modality === "audio" || modality === "video") && (
-        <Field label="Cắt file dài thành đoạn (giây)" hint="5–3600. Bỏ trống = mỗi file một câu." className="max-w-xs">
+        <Field label="Cắt file dài thành đoạn (giây)" hint="5–3600. Mỗi đoạn là một câu riêng (vd file 5 phút, cắt 30 giây → 10 câu). Bỏ trống = mỗi file một câu." className="max-w-md">
           <Input type="number" value={value.segmentSeconds ?? ""} onChange={(e) => onChange({ ...value, segmentSeconds: numOrNull(e.target.value) })} />
         </Field>
       )}
@@ -233,6 +250,8 @@ export function SchemaEditor({ modality, value, onChange }: { modality: Modality
         <ToolEditor
           key={i}
           tool={t}
+          index={i}
+          projectName={projectName}
           modality={modality}
           all={tools}
           onChange={(nt) => setTools(tools.map((x, k) => (k === i ? nt : x)))}
@@ -252,10 +271,11 @@ export function SchemaEditor({ modality, value, onChange }: { modality: Modality
           variant="outline"
           size="sm"
           disabled={tools.length >= 20}
-          onClick={() => setTools(tools.concat([{ name: `cong_cu_${tools.length + 1}`, kind: "classification", classes: ["lop_1", "lop_2"], required: true }]))}
+          onClick={() => setTools(tools.concat([{ name: autoToolName(projectName, "classification", tools), kind: "classification", classes: ["lop_1", "lop_2"], required: true }]))}
         >
           <Plus /> Thêm công cụ
         </Button>
+        <ToolGuideDialog modality={modality} />
         <Button type="button" variant="ghost" size="sm" onClick={() => setJson(JSON.stringify({ ...value, modality }, null, 2))}>
           <Braces /> Sửa JSON
         </Button>

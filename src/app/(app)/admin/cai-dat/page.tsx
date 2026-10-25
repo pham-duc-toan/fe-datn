@@ -19,7 +19,7 @@ import { api, put } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatDuration } from "@/lib/format";
 
-type Setting = { key: string; group: string; type: string; unit: string; min: number | null; max: number | null; effect: string; description: string; choices: string[] | null; defaultValue: unknown; value: unknown; version: number; updatedAt: string | null; updatedBy: string | null };
+type Setting = { key: string; name: string; group: string; type: string; unit: string; min: number | null; max: number | null; effect: string; description: string; choices: string[] | null; defaultValue: unknown; value: unknown; version: number; updatedAt: string | null; updatedBy: string | null };
 
 const HIGHLIGHT = new Set(["project.auto_approve", "annotation.auto_approve_agreed", "ledger.withdraw_auto_approve", "ledger.withdraw_auto_approve_max_vnd", "payment.manual_transfer_enabled", "payment.manual_transfer_auto_approve_max_vnd", "fee.platform_percent"]);
 
@@ -90,7 +90,7 @@ function Row({ s }: { s: Setting }) {
     try {
       const r = await put<Setting>(`/admin/settings/${s.key}`, { value: raw, reason: reason || null });
       qc.setQueryData<Setting[]>(["settings"], (old) => old?.map((x) => (x.key === s.key ? r : x)));
-      toast.success(`Đã lưu ${s.key}`);
+      toast.success(`Đã lưu “${s.name || s.key}”`);
       setReason("");
     } catch (e) {
       toast.error(errorMessage(e));
@@ -116,7 +116,8 @@ function Row({ s }: { s: Setting }) {
     <div className="grid gap-2 border-b py-3 last:border-0 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <code className="text-sm font-semibold">{s.key}</code>
+          <span className="text-sm font-semibold">{s.name || s.key}</span>
+          <code className="text-xs text-muted-foreground">{s.key}</code>
           {HIGHLIGHT.has(s.key) && (
             <ToneBadge tone="warning">
               <Zap className="size-3" /> tự duyệt / phí
@@ -189,7 +190,7 @@ export default function SettingsPage() {
   const groups = useMemo(() => {
     const m = new Map<string, Setting[]>();
     for (const s of q.data ?? []) {
-      if (search && !`${s.key} ${s.description}`.toLowerCase().includes(search.toLowerCase())) continue;
+      if (search && !`${s.name} ${s.key} ${s.description}`.toLowerCase().includes(search.toLowerCase())) continue;
       m.set(s.group, (m.get(s.group) ?? []).concat([s]));
     }
     return Array.from(m.entries());

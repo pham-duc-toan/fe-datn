@@ -41,6 +41,7 @@ type LabelerQ = {
   agreementSampleCount: number | null;
   matchedCount: number | null;
   passed: boolean | null;
+  rewarded?: boolean | null;
   goldAnswers: number;
   goldAccuracyPercent: number | null;
   dawidSkeneSkill: Record<string, number>;
@@ -141,7 +142,16 @@ export function QualityTab({ project: p }: { project: Project }) {
                       </TableCell>
                       <TableCell>{l.agreementPercent !== null ? `${l.agreementPercent}% (${l.matchedCount}/${l.agreementSampleCount})` : "—"}</TableCell>
                       <TableCell>{l.goldAccuracyPercent !== null ? `${l.goldAccuracyPercent}% (${l.goldAnswers})` : "—"}</TableCell>
-                      <TableCell>{l.passed === null ? <ToneBadge tone="muted">Chờ chấm</ToneBadge> : <ToneBadge tone={l.passed ? "success" : "danger"}>{l.passed ? "Đạt" : "Chưa đạt"}</ToneBadge>}</TableCell>
+                      <TableCell>
+                        {l.passed === null ? (
+                          <ToneBadge tone="muted">Chờ chấm</ToneBadge>
+                        ) : (
+                          <span className="flex flex-wrap gap-1">
+                            <ToneBadge tone={l.passed ? "success" : "danger"}>{l.passed ? "Đạt" : "Chưa đạt"}</ToneBadge>
+                            {l.passed && l.rewarded === false && <ToneBadge tone="warning">hết suất thưởng</ToneBadge>}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">
                         {Object.entries(l.dawidSkeneSkill).map(([k, v]) => (
                           <div key={k}>
