@@ -46,6 +46,7 @@ import { ActionDialog } from "@/components/common/action-dialog";
 import { StatusBadge, ToneBadge } from "@/components/common/status-badge";
 import { QueryState } from "@/components/common/states";
 import { UserName } from "@/components/common/user-name";
+import { UsernamePicker } from "@/components/common/username-picker";
 import { api, del, post, put } from "@/lib/api";
 import { errorMessage, messageForCode } from "@/lib/errors";
 import { formatDateTime, formatInviteCode } from "@/lib/format";
@@ -138,8 +139,7 @@ export function MembersTab({ project: p }: { project: Project }) {
       >(`/projects/${id}/consents`),
     enabled: p.consentRequired,
   });
-  const [role, setRole] = useState("labeler");
-  const [userIds, setUserIds] = useState("");
+  const [usernames, setUsernames] = useState<string[]>([]);
   const [emails, setEmails] = useState("");
   const [result, setResult] = useState<BatchResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -168,12 +168,10 @@ export function MembersTab({ project: p }: { project: Project }) {
     setBusy(true);
     try {
       const r = await post<BatchResult>(`/projects/${id}/members/batch`, {
-        role,
+        // Nhãn chấm theo đa số + câu vàng (mô hình 3.18) — không còn vai trò người duyệt, chỉ mời labeler.
+        role: "labeler",
         // Mời theo username (thay cho userId) — backend tra identity ra tài khoản.
-        usernames: userIds
-          .split(/[\s,;]+/)
-          .map((x) => x.trim())
-          .filter(Boolean),
+        usernames,
         emails: emails
           .split(/[\s,;]+/)
           .map((x) => x.trim())
@@ -321,31 +319,15 @@ export function MembersTab({ project: p }: { project: Project }) {
             <CardHeader>
               <CardTitle>Mời thành viên</CardTitle>
               <CardDescription>
-                Theo userId: thêm thẳng, kết quả chi tiết. Theo email: luôn gửi
-                lời mời — người nhận tự chấp nhận; không lộ email nào có tài
-                khoản.
+                Theo username: thêm thẳng vào dự án. Theo email: gửi lời mời —
+                người nhận tự chấp nhận.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Field label="Vai trò">
-                <Select value={role} onValueChange={setRole}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="labeler">Người gán nhãn</SelectItem>
-                    <SelectItem value="reviewer">Người duyệt</SelectItem>
-                  </SelectContent>
-                </Select>
+              <Field label="Username" hint="Gõ vài chữ đầu để chọn labeler gợi ý; Enter hoặc dấu phẩy để thêm nhiều người.">
+                <UsernamePicker multiple value={usernames} onChange={setUsernames} />
               </Field>
-              <Field label="userId" hint="Mỗi dòng / dấu phẩy một id">
-                <Textarea
-                  rows={2}
-                  value={userIds}
-                  onChange={(e) => setUserIds(e.target.value)}
-                />
-              </Field>
-              <Field label="Email" hint="Tối đa theo hạn mức email / 24 giờ">
+              <Field label="Email" hint="Mỗi dòng hoặc cách nhau dấu phẩy">
                 <Textarea
                   rows={2}
                   value={emails}
@@ -355,7 +337,7 @@ export function MembersTab({ project: p }: { project: Project }) {
               <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => void invite()}
-                  disabled={busy || (!userIds.trim() && !emails.trim())}
+                  disabled={busy || (usernames.length === 0 && !emails.trim())}
                 >
                   {busy ? <Loader2 className="animate-spin" /> : <UserPlus />}{" "}
                   Mời
@@ -442,7 +424,8 @@ export function MembersTab({ project: p }: { project: Project }) {
                     name: "expiresInHours",
                     label: "Hết hạn sau (giờ)",
                     type: "number",
-                    hint: "Trống = 7 ngày",
+                    defaultValue: 168,
+                    hint: "168 giờ = 7 ngày",
                   },
                   { name: "note", label: "Ghi chú", placeholder: "Lớp K66" },
                 ]}

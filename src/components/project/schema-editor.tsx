@@ -16,6 +16,8 @@ import { TOOL_GUIDE, ToolGuideDialog } from "@/components/project/tool-guide";
 
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
 const parseClasses = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
+/** Lớp gợi ý khi thêm công cụ có lớp — doanh nghiệp sửa lại theo bài toán. */
+const DEFAULT_CLASSES = ["Lớp 1", "Lớp 2"];
 
 function AttributeEditor({ attrs, onChange }: { attrs: AttributeDef[]; onChange: (a: AttributeDef[]) => void }) {
   return (
@@ -29,7 +31,7 @@ function AttributeEditor({ attrs, onChange }: { attrs: AttributeDef[]; onChange:
       {attrs.map((a, i) => (
         <div key={i} className="grid grid-cols-[1fr_110px_auto_auto] items-center gap-2">
           <Input className="h-7" value={a.name} onChange={(e) => onChange(attrs.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} />
-          <Select value={a.type} onValueChange={(v) => onChange(attrs.map((x, k) => (k === i ? { ...x, type: v as AttributeDef["type"], options: v === "choice" ? x.options ?? ["a", "b"] : undefined } : x)))}>
+          <Select value={a.type} onValueChange={(v) => onChange(attrs.map((x, k) => (k === i ? { ...x, type: v as AttributeDef["type"], options: v === "choice" ? x.options ?? ["Lựa chọn 1", "Lựa chọn 2"] : undefined } : x)))}>
             <SelectTrigger size="sm" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -60,7 +62,7 @@ function AttributeEditor({ attrs, onChange }: { attrs: AttributeDef[]; onChange:
   );
 }
 
-function ToolEditor({ tool, index, projectName, modality, all, onChange, onRemove, onMove }: { tool: Tool; index: number; projectName: string; modality: Modality; all: Tool[]; onChange: (t: Tool) => void; onRemove: () => void; onMove: (d: -1 | 1) => void }) {
+function ToolEditor({ tool, projectName, modality, all, thresholds, onChange, onRemove, onMove }: { tool: Tool; projectName: string; modality: Modality; all: Tool[]; thresholds: Partial<Record<ToolKind, number>>; onChange: (t: Tool) => void; onRemove: () => void; onMove: (d: -1 | 1) => void }) {
   const [classText, setClassText] = useState((tool.classes ?? []).join("\n"));
   const set = (patch: Partial<Tool>) => onChange({ ...tool, ...patch });
   const hasClasses = CLASS_TOOLS.includes(tool.kind);
@@ -68,7 +70,6 @@ function ToolEditor({ tool, index, projectName, modality, all, onChange, onRemov
   return (
     <div className="space-y-3 rounded-lg border p-3">
       <div className="flex flex-wrap items-end gap-2">
-        <span className="flex h-8 items-center text-sm font-medium text-muted-foreground">Câu {index + 1}</span>
         <Field label="Loại công cụ" className="w-56">
           <Select
             value={tool.kind}
@@ -78,7 +79,7 @@ function ToolEditor({ tool, index, projectName, modality, all, onChange, onRemov
                 name: autoToolName(projectName, v as ToolKind, all.filter((t) => t !== tool)),
                 kind: v as ToolKind,
                 required: tool.required,
-                classes: CLASS_TOOLS.includes(v as ToolKind) ? tool.classes ?? ["lop_1", "lop_2"] : undefined,
+                classes: CLASS_TOOLS.includes(v as ToolKind) ? tool.classes ?? DEFAULT_CLASSES : undefined,
               })
             }
           >
@@ -162,8 +163,9 @@ function ToolEditor({ tool, index, projectName, modality, all, onChange, onRemov
           </Field>
         )}
         {!["classification", "pairwise", "freeText", "number"].includes(tool.kind) && (
-          <Field label="Ngưỡng khớp (0–1)" hint={`Giống tới mức nào thì tính là giống đa số. Trống = mặc định. ${TOOL_GUIDE[tool.kind].grading}`} className="w-72">
-            <Input className="h-8" type="number" step="0.05" value={tool.matchThreshold ?? ""} onChange={(e) => set({ matchThreshold: numOrNull(e.target.value) })} />
+          <Field label="Ngưỡng khớp (0–1)" hint={`Giống tới mức nào thì tính là giống đa số. ${TOOL_GUIDE[tool.kind].grading}`} className="w-72">
+            {/* Chưa đặt riêng thì hiện ngưỡng của nền tảng cho loại công cụ này (không lưu cứng — admin đổi thì theo). */}
+            <Input className="h-8" type="number" step="0.05" min={0} max={1} value={tool.matchThreshold ?? thresholds[tool.kind] ?? ""} onChange={(e) => set({ matchThreshold: numOrNull(e.target.value) })} />
           </Field>
         )}
         {tool.kind === "number" && (
@@ -191,7 +193,7 @@ function ToolEditor({ tool, index, projectName, modality, all, onChange, onRemov
               <SelectContent>
                 {all.map((t, k) => ({ t, k })).filter(({ t }) => t.kind === "span").map(({ t, k }) => (
                   <SelectItem key={t.name} value={t.name}>
-                    Câu {k + 1}: {TOOL_LABEL[t.kind]}
+                    {TOOL_LABEL[t.kind]} (công cụ thứ {k + 1})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -204,7 +206,20 @@ function ToolEditor({ tool, index, projectName, modality, all, onChange, onRemov
   );
 }
 
-export function SchemaEditor({ modality, value, onChange, projectName = "" }: { modality: Modality; value: LabelSchema; onChange: (s: LabelSchema) => void; projectName?: string }) {
+export function SchemaEditor({
+  modality,
+  value,
+  onChange,
+  projectName = "",
+  thresholds = {},
+}: {
+  modality: Modality;
+  value: LabelSchema;
+  onChange: (s: LabelSchema) => void;
+  projectName?: string;
+  /** Ngưỡng khớp mặc định theo loại công cụ (readiness.limits.matchThresholds). */
+  thresholds?: Partial<Record<ToolKind, number>>;
+}) {
   const [json, setJson] = useState<string | null>(null);
   const [jsonErr, setJsonErr] = useState<string | null>(null);
   const tools = value.tools;
@@ -225,8 +240,8 @@ export function SchemaEditor({ modality, value, onChange, projectName = "" }: { 
                 onChange({ ...s, modality });
                 setJson(null);
                 setJsonErr(null);
-              } catch (e) {
-                setJsonErr((e as Error).message);
+              } catch {
+                setJsonErr("JSON chưa đúng cú pháp — kiểm tra dấu phẩy, ngoặc và dấu nháy kép.");
               }
             }}
           >
@@ -250,8 +265,8 @@ export function SchemaEditor({ modality, value, onChange, projectName = "" }: { 
         <ToolEditor
           key={i}
           tool={t}
-          index={i}
           projectName={projectName}
+          thresholds={thresholds}
           modality={modality}
           all={tools}
           onChange={(nt) => setTools(tools.map((x, k) => (k === i ? nt : x)))}
@@ -271,7 +286,7 @@ export function SchemaEditor({ modality, value, onChange, projectName = "" }: { 
           variant="outline"
           size="sm"
           disabled={tools.length >= 20}
-          onClick={() => setTools(tools.concat([{ name: autoToolName(projectName, "classification", tools), kind: "classification", classes: ["lop_1", "lop_2"], required: true }]))}
+          onClick={() => setTools(tools.concat([{ name: autoToolName(projectName, "classification", tools), kind: "classification", classes: DEFAULT_CLASSES, required: true }]))}
         >
           <Plus /> Thêm công cụ
         </Button>

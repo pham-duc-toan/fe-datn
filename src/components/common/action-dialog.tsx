@@ -11,11 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { errorMessage } from "@/lib/errors";
+import { UsernamePicker } from "./username-picker";
 
 export type ActionField = {
   name: string;
   label: string;
-  type?: "text" | "textarea" | "number" | "checkbox" | "select" | "password" | "datetime";
+  /** "username": ô nhập có gợi ý username labeler khi gõ. */
+  type?: "text" | "textarea" | "number" | "checkbox" | "select" | "password" | "datetime" | "username";
   required?: boolean;
   placeholder?: string;
   options?: { value: string; label: string }[];
@@ -98,6 +100,8 @@ export function ActionDialog({
                     </Label>
                     {f.type === "textarea" ? (
                       <Textarea id={`af-${f.name}`} rows={3} placeholder={f.placeholder} value={String(values[f.name] ?? "")} onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))} />
+                    ) : f.type === "username" ? (
+                      <UsernamePicker id={`af-${f.name}`} placeholder={f.placeholder} value={values[f.name] ? [String(values[f.name])] : []} onChange={(x) => setValues((v) => ({ ...v, [f.name]: x[0] ?? "" }))} />
                     ) : f.type === "select" ? (
                       <Select value={String(values[f.name] ?? "")} onValueChange={(x) => setValues((v) => ({ ...v, [f.name]: x }))}>
                         <SelectTrigger id={`af-${f.name}`} className="w-full">

@@ -73,7 +73,7 @@ export function QualityTab({ project: p }: { project: Project }) {
             <Card>
               <CardHeader>
                 <CardTitle>Mức đồng thuận theo công cụ</CardTitle>
-                <CardDescription>Krippendorff alpha: 1 = nhất trí hoàn toàn, ≤ 0 = như đoán bừa. Cập nhật theo lô.</CardDescription>
+                <CardDescription>Krippendorff alpha: 1 = nhất trí hoàn toàn, ≤ 0 = như đoán bừa.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -149,6 +149,7 @@ export function QualityTab({ project: p }: { project: Project }) {
                           <span className="flex flex-wrap gap-1">
                             <ToneBadge tone={l.passed ? "success" : "danger"}>{l.passed ? "Đạt" : "Chưa đạt"}</ToneBadge>
                             {l.passed && l.rewarded === false && <ToneBadge tone="warning">hết suất thưởng</ToneBadge>}
+                            {!l.passed && l.rewarded === true && <ToneBadge tone="info">được thưởng (lấp suất)</ToneBadge>}
                           </span>
                         )}
                       </TableCell>

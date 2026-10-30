@@ -13,6 +13,7 @@ import { CopyButton } from "@/components/common/misc";
 import { ActionDialog } from "@/components/common/action-dialog";
 import { api, ApiError, post } from "@/lib/api";
 import { API_URL } from "@/lib/config";
+import { useOrigin } from "@/hooks/use-origin";
 import { formatDateTime } from "@/lib/format";
 
 type Key = { apiKey: string | null; prefix: string; createdAt: string };
@@ -52,6 +53,7 @@ export default function ApiKeyPage() {
   const [fresh, setFresh] = useState<string | null>(null);
   const k = fresh ?? "YOUR_API_TOKEN";
   const endpoint = `${API_URL}/links/api-shorten`;
+  const origin = useOrigin();
 
   return (
     <>
@@ -111,7 +113,7 @@ export default function ApiKeyPage() {
               </ul>
             </div>
             <p>Thành công:</p>
-            <Code>{`{"status":"success","shortenedUrl":"${typeof window !== "undefined" ? window.location.origin : ""}/g/xxxxxx"}`}</Code>
+            <Code>{`{"status":"success","shortenedUrl":"${origin}/g/xxxxxx"}`}</Code>
             <p>Lỗi (kèm mã HTTP tương ứng):</p>
             <Code>{`{"status":"error","code":"url_khong_hop_le","message":"Link dich phai la dia chi http(s) day du."}`}</Code>
             <p className="text-muted-foreground">

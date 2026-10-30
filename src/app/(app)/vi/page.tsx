@@ -21,7 +21,7 @@ import { QueryState } from "@/components/common/states";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api, newIdempotencyKey, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import { daysAgo, formatDate, formatDateTime, formatVnd, isoDay } from "@/lib/format";
+import { daysAgo, formatDateTime, formatVnd, isoDay } from "@/lib/format";
 import { depositStatus, EARNING_KIND, PROVIDER_LABEL, withdrawalState } from "@/lib/labels";
 import type { Balance, Deposit, Paged, Transaction, Withdrawal } from "@/lib/types";
 import { useUrlPage, useUrlState } from "@/lib/use-url-state";
@@ -375,7 +375,7 @@ export default function WalletPage() {
 
   return (
     <>
-      <PageHeader title="Ví" description={`Cập nhật ${formatDate(new Date().toISOString())}. Tiền là số nguyên đồng.`} />
+      <PageHeader title="Ví" description="Số dư, nạp tiền, rút tiền và lịch sử giao dịch." />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {(isBiz || roles.includes("business")) && (
           <>

@@ -17,6 +17,7 @@ import { api, post, put, uploadToSignedUrl } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatDateTime } from "@/lib/format";
 import { kybStatus } from "@/lib/labels";
+import { FilePreview } from "@/components/common/file-preview";
 import type { KybProfile } from "@/lib/types";
 
 export default function KybPage() {
@@ -114,6 +115,7 @@ function KybForm({ k }: { k: KybProfile }) {
                 </span>
               </label>
               {progress !== null && <p className="text-xs text-muted-foreground">Đang tải lên {Math.round(progress * 100)}%</p>}
+              <FilePreview file={file} url={k.licenseUrl} fileName={file ? file.name : k.licenseFileName} onExpired={() => void qc.invalidateQueries({ queryKey: ["kyb"] })} className="mt-2" />
             </Field>
             {!locked && (
               <div className="flex gap-2">

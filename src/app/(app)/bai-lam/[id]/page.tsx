@@ -63,18 +63,23 @@ function ResultCard({ s, freeText }: { s: AttemptSummary; freeText: boolean }) {
     );
   const dat = s.finalPassed ?? s.passed;
   // Đạt nhưng các suất thưởng đã trao cho bài nộp trước (bản cũ không có rewarded → coi như được thưởng).
-  const thuong = dat && s.rewarded !== false;
+  // Chưa đạt mà rewarded = true: dự án lấp suất còn trống bằng bài giống đa số nhất.
+  const lapSuat = !dat && s.rewarded === true;
+  const thuong = (dat && s.rewarded !== false) || lapSuat;
   return (
-    <Card className={cn(dat ? "border-emerald-300" : "border-destructive/40")}>
+    <Card className={cn(dat || lapSuat ? "border-emerald-300" : "border-destructive/40")}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          {dat ? <CheckCircle2 className="size-5 text-emerald-600" /> : <XCircle className="size-5 text-destructive" />}
-          {dat ? "Bài đạt" : "Bài chưa đạt"}
+          {dat || lapSuat ? <CheckCircle2 className="size-5 text-emerald-600" /> : <XCircle className="size-5 text-destructive" />}
+          {dat ? "Bài đạt" : lapSuat ? "Được thưởng" : "Bài chưa đạt"}
+          {lapSuat && <ToneBadge tone="info">lấp suất còn trống</ToneBadge>}
           {s.passed === false && s.finalPassed === true && <ToneBadge tone="success">đạt sau khiếu nại</ToneBadge>}
           {dat && !thuong && <ToneBadge tone="warning">hết suất thưởng</ToneBadge>}
         </CardTitle>
         <CardDescription>
-          {thuong
+          {lapSuat
+            ? `Bài chưa tới ngưỡng đạt, nhưng dự án còn suất trống và bài của bạn nằm trong nhóm giống đa số nhất — đã nhận thưởng ${formatVnd(s.rewardVnd)} vào ví.`
+            : thuong
             ? `Đã nhận thưởng ${formatVnd(s.rewardVnd)} vào ví.`
             : dat
               ? "Bài đạt nhưng các suất thưởng đã được trao cho những bài đạt nộp sớm hơn. Kết quả vẫn được tính vào uy tín của bạn."

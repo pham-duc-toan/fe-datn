@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/common/page-header";
 import { Field } from "@/components/common/misc";
+import { TagPicker } from "@/components/common/tag-picker";
 import { Loading } from "@/components/common/states";
 import { api, post, put, uploadToSignedUrl } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
@@ -19,8 +20,6 @@ import { MODALITY_LABEL, ROLE_LABEL } from "@/lib/labels";
 import type { Modality, Profile } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { usernameError } from "@/lib/tool-names";
-
-const splitList = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
 
 export default function ProfilePage() {
   const q = useQuery({ queryKey: ["profile"], queryFn: () => api<Profile>("/me/profile") });
@@ -34,8 +33,8 @@ function ProfileForm({ p }: { p: Profile }) {
   const [username, setUsername] = useState(p.username ?? "");
   const usernameErr = username !== p.username ? usernameError(username) : null;
   const [bio, setBio] = useState(p.bio ?? "");
-  const [domains, setDomains] = useState((p.skills.domains ?? []).join(", "));
-  const [languages, setLanguages] = useState((p.skills.languages ?? []).join(", "));
+  const [domains, setDomains] = useState<string[]>(p.skills.domains ?? []);
+  const [languages, setLanguages] = useState<string[]>(p.skills.languages ?? []);
   const [mods, setMods] = useState<string[]>(p.skills.modalities ?? []);
   const [busy, setBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -100,7 +99,7 @@ function ProfileForm({ p }: { p: Profile }) {
               >
                 <Input value={username} maxLength={31} onChange={(e) => setUsername(e.target.value.toLowerCase())} />
               </Field>
-              <Field label="Tên hiển thị" hint="1–100 ký tự. Token mang tên mới từ lần đăng nhập / làm mới sau.">
+              <Field label="Tên hiển thị" hint="1–100 ký tự">
                 <Input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
               </Field>
               <Field label="Giới thiệu" hint={`${bio.length}/500`}>
@@ -114,14 +113,14 @@ function ProfileForm({ p }: { p: Profile }) {
           <Card>
             <CardHeader>
               <CardTitle>Hồ sơ kỹ năng</CardTitle>
-              <CardDescription>Dùng để gợi ý dự án phù hợp cho bạn.</CardDescription>
+              <CardDescription>Dự án được gợi ý theo số thẻ lĩnh vực / ngôn ngữ trùng với dự án và loại dữ liệu bạn quen làm.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Field label="Lĩnh vực" hint="Ngăn cách bằng dấu phẩy, vd: Y tế, Giao thông, Pháp luật">
-                <Input value={domains} onChange={(e) => setDomains(e.target.value)} />
+              <Field label="Lĩnh vực am hiểu">
+                <TagPicker kind="domain" value={domains} onChange={setDomains} max={20} />
               </Field>
-              <Field label="Ngôn ngữ" hint="vd: vi, en">
-                <Input value={languages} onChange={(e) => setLanguages(e.target.value)} />
+              <Field label="Ngôn ngữ thành thạo">
+                <TagPicker kind="language" value={languages} onChange={setLanguages} max={20} />
               </Field>
               <div className="space-y-2">
                 <span className="text-sm font-medium">Loại dữ liệu quen làm</span>
@@ -135,7 +134,7 @@ function ProfileForm({ p }: { p: Profile }) {
                 </div>
               </div>
               <Button
-                onClick={() => void run("skills", () => put<Profile>("/me/skills", { domains: splitList(domains), languages: splitList(languages), modalities: mods }), "Đã lưu kỹ năng")}
+                onClick={() => void run("skills", () => put<Profile>("/me/skills", { domains, languages, modalities: mods }), "Đã lưu kỹ năng")}
                 disabled={busy === "skills"}
               >
                 {busy === "skills" && <Loader2 className="animate-spin" />} Lưu kỹ năng

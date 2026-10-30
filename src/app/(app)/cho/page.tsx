@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
 import { ToneBadge } from "@/components/common/status-badge";
+import { useReasonText, useTags } from "@/hooks/use-tags";
 import { api } from "@/lib/api";
 import { formatDate, formatVnd } from "@/lib/format";
 import { MODALITY_LABEL, toolKindsText, VISIBILITY_LABEL } from "@/lib/labels";
@@ -21,6 +22,7 @@ type Rec = {
 };
 
 function ProjectCard({ p }: { p: ProjectListItem }) {
+  const { name } = useTags();
   return (
     <Link href={`/cho/${p.id}`} className="block">
       <Card className="h-full transition-shadow hover:shadow-md">
@@ -68,7 +70,9 @@ function ProjectCard({ p }: { p: ProjectListItem }) {
               </ToneBadge>
             )}
           </div>
-          {p.domains.length > 0 && <p className="text-xs text-muted-foreground">{p.domains.join(" · ")}</p>}
+          {p.domains.length + p.languages.length > 0 && (
+            <p className="text-xs text-muted-foreground">{p.domains.map((c) => name("domain", c)).concat(p.languages.map((c) => name("language", c))).join(" · ")}</p>
+          )}
         </CardContent>
       </Card>
     </Link>
@@ -83,6 +87,7 @@ export default function MarketplacePage() {
     queryFn: () => api<Paged<ProjectListItem>>("/projects", { query: { status: "running", page, pageSize: 18, modality: modality === "all" ? undefined : modality } }),
   });
   const rec = useQuery({ queryKey: ["recommended", 6], queryFn: () => api<Rec[]>("/projects/recommended", { query: { limit: 6 } }) });
+  const reasonText = useReasonText();
 
   return (
     <>
@@ -120,7 +125,7 @@ export default function MarketplacePage() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {MODALITY_LABEL[r.modality]} · {r.questionCount} câu · {toolKindsText(r.toolKinds)}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{r.reasons.join(", ")}</p>
+                {r.reasons.length > 0 && <p className="mt-0.5 text-xs text-muted-foreground">Hợp vì: {reasonText(r.reasons)}</p>}
               </Link>
             ))}
           </div>

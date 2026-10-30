@@ -102,7 +102,7 @@ export default function FraudPage() {
     <>
       <PageHeader
         title="Hồ sơ nghi gian lận"
-        description="Hệ thống không tự khoá ai — chỉ mở hồ sơ để admin xem. Ngưỡng là setting quality.fraud_*."
+        description="Hệ thống không tự khoá ai — chỉ mở hồ sơ để admin xem. Ngưỡng phát hiện chỉnh ở Cài đặt."
         actions={
           <>
             <Select value={type} onValueChange={(v) => { setType(v); setPage(1); }}>

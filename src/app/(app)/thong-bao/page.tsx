@@ -34,7 +34,6 @@ export default function NotificationsPage() {
     <>
       <PageHeader
         title="Thông báo"
-        description="Thông báo mới được đẩy ngay khi bạn đang mở web."
         actions={
           <>
             <label className="flex items-center gap-2 text-sm">

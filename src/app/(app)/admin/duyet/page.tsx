@@ -102,7 +102,7 @@ export default function ApprovalsPage() {
     <>
       <PageHeader
         title="Hàng đợi duyệt chung"
-        description="Đọc từ sự kiện của mọi service — cập nhật trễ vài giây sau khi xử lý."
+        description="Mọi việc chờ admin xử lý. Danh sách cập nhật sau vài giây."
         actions={
           <>
             <Select value={kind} onValueChange={(v) => { setKind(v); setPage(1); }}>

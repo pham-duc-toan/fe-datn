@@ -28,7 +28,7 @@ export default function MyProjectsPage() {
     <>
       <PageHeader
         title="Dự án của tôi"
-        description="Dự án bạn sở hữu và dự án bạn được mời làm người duyệt."
+        description="Các dự án bạn sở hữu."
         actions={
           <>
             <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>

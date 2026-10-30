@@ -203,37 +203,65 @@ const MESSAGES: Record<string, string> = {
   chua_san_sang_publish: "Dự án chưa đủ điều kiện publish — xem checklist.",
   da_bi_chan: "Đã bị chặn.",
   da_co_cau_hoi_vang: "Mẫu đã có câu vàng.",
-  chua_cau_hinh_google_drive: "Máy chủ chưa cấu hình nhập từ Google Drive.",
-  chua_dong_bo_tam_dung: "Lệnh tạm dừng chưa đồng bộ, thử lại sau vài giây.",
+  chua_cau_hinh_google_drive: "Chưa hỗ trợ nhập từ Google Drive.",
+  chua_dong_bo_tam_dung: "Dự án đang được tạm dừng, thử lại sau vài giây.",
 };
 
-/** Lỗi nhãn có `detail` chỉ đúng chỗ sai — hiện gần nguyên văn (mục 1). */
-const SHOW_DETAIL = new Set(["nhan_sai_dinh_dang", "nhan_khong_hop_le", "tap_nhan_sai_dinh_dang", "tap_nhan_khong_hop_le",
-  "duoi_muc_toi_thieu", "so_tien_nap_khong_hop_le", "gia_tri_khong_hop_le", "chua_du_cap_do", "chua_du_uy_tin", "chua_the_dong",
-  "vuot_han_muc_moi_email", "cong_cu_khong_hop_cong_link", "thuong_duoi_toi_thieu", "so_suat_khong_hop_le", "nguong_dat_ngoai_khoang",
-  "qua_nhieu_cau", "xung_dot_setting"]);
+/** Câu có dấu tiếng Việt — backend viết thông báo cho người dùng bằng tiếng Việt có dấu. */
+const VIET = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
+
+/** Lỗi của khung ASP.NET (ràng buộc model) chưa có `code` riêng: dịch các câu tiếng Anh hay gặp. */
+function validationMessages(errors: Record<string, string[] | string>): string {
+  const out: string[] = [];
+  for (const [field, raw] of Object.entries(errors)) {
+    for (const m of Array.isArray(raw) ? raw : [raw]) {
+      if (VIET.test(m)) out.push(m);
+      else if (/required/i.test(m)) out.push(`Thiếu “${field}”.`);
+      else out.push(`“${field}” không hợp lệ.`);
+    }
+  }
+  return out.length ? `Dữ liệu gửi lên chưa hợp lệ: ${Array.from(new Set(out)).join(" ")}` : "Dữ liệu gửi lên chưa hợp lệ.";
+}
+
+const STATUS_MESSAGE: Record<number, string> = {
+  400: "Yêu cầu không hợp lệ.",
+  401: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.",
+  403: "Bạn không có quyền thực hiện thao tác này.",
+  404: "Không tìm thấy (hoặc bạn không có quyền với mục này).",
+  409: "Thao tác xung đột với trạng thái hiện tại, hãy tải lại trang rồi thử lại.",
+  413: "Dữ liệu gửi lên quá lớn.",
+  429: "Bạn thao tác quá nhanh, hãy thử lại sau ít giây.",
+  502: "Hệ thống đang bận hoặc đang khởi động lại, thử lại sau ít phút.",
+  503: "Hệ thống tạm thời chưa sẵn sàng, thử lại sau ít phút.",
+  504: "Hệ thống phản hồi quá lâu, thử lại sau.",
+};
 
 export function messageForCode(code: string): string | undefined {
   return MESSAGES[code];
 }
 
+/**
+ * Câu báo lỗi cho người dùng. Thứ tự: câu tiếng Việt có dấu của backend (đầy đủ nhất — chỉ rõ chỗ sai, giới hạn)
+ * → bản dịch theo `code` → lỗi ràng buộc model → câu chung theo mã HTTP. Không bao giờ hiện câu không dấu / tiếng Anh
+ * thô của hệ thống.
+ */
 export function errorMessage(e: unknown): string {
   if (e instanceof ApiError) {
     const base = MESSAGES[e.code];
-    // Backend đã trả câu tiếng Việt có dấu (kèm chi tiết như giới hạn ký tự) → dùng luôn, đầy đủ hơn bản dịch tĩnh.
-    const vietBackend = Boolean(e.detail && /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(e.detail));
     let msg: string;
-    if (vietBackend) msg = e.detail!;
-    else if (base && SHOW_DETAIL.has(e.code) && e.detail) msg = `${base} ${e.detail}`;
+    if (e.detail && VIET.test(e.detail)) msg = e.detail;
     else if (base) msg = base;
-    else if (e.status === 400 && e.data.errors && typeof e.data.errors === "object") {
-      msg = Object.values(e.data.errors as Record<string, string[]>).flat().join(" ");
-    } else msg = e.detail || `Lỗi ${e.status}${e.traceId ? ` (mã tra cứu ${e.traceId})` : ""}`;
+    else if (e.status === 400 && e.data.errors && typeof e.data.errors === "object") msg = validationMessages(e.data.errors as Record<string, string[]>);
+    else msg = STATUS_MESSAGE[e.status] ?? (e.status >= 500 ? "Hệ thống gặp lỗi, thử lại sau." : "Không thực hiện được thao tác.");
+    if (e.status >= 500 && e.traceId) msg += ` (mã tra cứu ${e.traceId})`;
     if (e.status === 429 && e.retryAfter) msg += ` Thử lại sau ${e.retryAfter} giây.`;
     return msg;
   }
-  if (e instanceof Error) return e.message;
-  return "Đã có lỗi xảy ra.";
+  // fetch() lỗi mạng: "Failed to fetch" / "NetworkError..." / "Load failed".
+  if (e instanceof TypeError && /fetch|network|load failed/i.test(e.message)) return "Không kết nối được máy chủ — kiểm tra mạng rồi thử lại.";
+  if (e instanceof DOMException && e.name === "AbortError") return "Yêu cầu đã bị huỷ.";
+  if (e instanceof Error && VIET.test(e.message)) return e.message;
+  return "Đã có lỗi xảy ra, thử lại sau.";
 }
 
 export function isApiError(e: unknown, code?: string): e is ApiError {

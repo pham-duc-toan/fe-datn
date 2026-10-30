@@ -160,7 +160,7 @@ export function DataTab({ project: p }: { project: Project }) {
               </TabsList>
               {isFile && (
                 <TabsContent value="files" className="space-y-2 pt-3">
-                  <p className="text-sm text-muted-foreground">Trình duyệt đẩy thẳng lên kho file (không qua backend), mỗi file ≤ 5 GB. Đuôi cho phép: {ACCEPT[p.modality]}</p>
+                  <p className="text-sm text-muted-foreground">Mỗi file ≤ 5 GB. Đuôi cho phép: {ACCEPT[p.modality]}</p>
                   <label className={busy ? "pointer-events-none opacity-50" : ""}>
                     <input type="file" multiple accept={ACCEPT[p.modality]} className="hidden" onChange={(e) => e.target.files && void uploadFiles(Array.from(e.target.files))} />
                     <span className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-6 text-sm hover:bg-muted">
@@ -290,7 +290,7 @@ export function DataTab({ project: p }: { project: Project }) {
       <Card>
         <CardHeader>
           <CardTitle>Mẫu ({samples.data?.total ?? 0})</CardTitle>
-          <CardDescription>Bản gốc (chủ dự án xem không có watermark). Link xem sống 5 phút.</CardDescription>
+          <CardDescription>Bản gốc, không có watermark.</CardDescription>
         </CardHeader>
         <CardContent>
           <QueryState query={samples} empty={(d) => d.items.length === 0}>

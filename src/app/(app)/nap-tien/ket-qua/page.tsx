@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { api, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatVnd } from "@/lib/format";
-import { depositStatus } from "@/lib/labels";
+import { depositStatus, PROVIDER_LABEL } from "@/lib/labels";
 import type { Deposit } from "@/lib/types";
 
 function toGuid(s: string | null): string | null {
@@ -71,7 +71,7 @@ export default function DepositResultPage() {
         <CardHeader>
           {done ? <CheckCircle2 className="mx-auto size-10 text-emerald-600" /> : bad || shownError ? <XCircle className="mx-auto size-10 text-destructive" /> : <Loader2 className="mx-auto size-10 animate-spin text-muted-foreground" />}
           <CardTitle className="text-xl">{done ? "Nạp tiền thành công" : bad ? depositStatus(dep!.status)[0] : shownError ? "Có lỗi" : "Đang xác nhận với cổng thanh toán…"}</CardTitle>
-          <CardDescription>{dep ? `${formatVnd(dep.amountVnd)} · ${dep.provider}` : shownError}</CardDescription>
+          <CardDescription>{dep ? `${formatVnd(dep.amountVnd)} · ${PROVIDER_LABEL[dep.provider] ?? dep.provider}` : shownError}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button asChild className="w-full">

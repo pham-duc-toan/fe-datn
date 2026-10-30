@@ -42,12 +42,12 @@ export default function LabelerListsPage() {
             trigger={<Button><Plus /> Thêm</Button>}
             title="Thêm labeler vào danh sách"
             fields={[
-              { name: "labelerId", label: "userId của labeler", required: true },
+              { name: "username", label: "Username của labeler", type: "username", placeholder: "Gõ username, vd: an", required: true },
               { name: "kind", label: "Danh sách", type: "select", defaultValue: kind, options: [{ value: "preferred", label: "Ưu tiên" }, { value: "blocked", label: "Chặn" }] },
               { name: "note", label: "Ghi chú" },
             ]}
             onConfirm={async (v) => {
-              await put(`/projects/labeler-lists/${String(v.labelerId).trim()}`, { kind: v.kind, note: v.note || null });
+              await put(`/projects/labeler-lists/by-username/${encodeURIComponent(String(v.username).trim().replace(/^@/, ""))}`, { kind: v.kind, note: v.note || null });
               toast.success("Đã cập nhật danh sách");
               await qc.invalidateQueries({ queryKey: ["labeler-lists"] });
             }}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, CircleDashed, Flag, Loader2, Pause, Play, Rocket, XOctagon } from "lucide-react";
+import { AlertTriangle, CircleDashed, Flag, Pause, Play, XOctagon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +15,9 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { api, ApiError, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatNumber, formatVnd } from "@/lib/format";
-import { FINISH_REASON, kybStatus, phaseOf, projectStatus, READINESS_LABEL, READINESS_WARNING, toolKindsText } from "@/lib/labels";
+import { FINISH_REASON, phaseOf, projectStatus, toolKindsText } from "@/lib/labels";
 import { FreeTextNotice, hasFreeText } from "./free-text-notice";
-import type { AttemptSummary, KybProfile, Progress as ProgressT, Project, Readiness } from "@/lib/types";
+import type { AttemptSummary, Progress as ProgressT, Project, Readiness } from "@/lib/types";
 
 const ESCROW_STATE: Record<string, string> = { active: "đang giữ", closing: "đang chờ trả nốt thưởng", closed: "đã đóng" };
 import { useSetProject } from "./use-project";
@@ -53,7 +53,6 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
     // Video đang chuẩn bị: tự cập nhật checklist tới khi xong.
     refetchInterval: (q) => ((q.state.data?.videoPreparingCount ?? 0) > 0 ? 5000 : false),
   });
-  const kyb = useQuery({ queryKey: ["kyb"], queryFn: () => api<KybProfile>("/kyb/me"), enabled: p.status === "draft" });
   const progress = useQuery({ queryKey: ["progress", p.id], queryFn: () => api<ProgressT>(`/tasks/projects/${p.id}/progress`), enabled: Boolean(published), refetchInterval: 20000 });
   // Bài đạt (kể cả khiếu nại được chấp nhận) — có ngay khi chấm xong, trước khi dự án chốt.
   const attempts = useQuery({
@@ -78,30 +77,13 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
       const r = await post<Project>(`/projects/${p.id}/${path}`, body);
       setProject(r);
       toast.success(label);
-      if (path === "publish") pollAfterPublish();
       void qc.invalidateQueries({ queryKey: ["progress", p.id] });
     } catch (e) {
       if (e instanceof ApiError && e.code === "chua_the_dong") setCloseErr(e);
       else toast.error(errorMessage(e));
-      if (e instanceof ApiError && (e.code === "chua_xac_minh_doanh_nghiep" || e.code === "chua_xac_thuc_email")) {
-        toast.info("Nếu bạn vừa được duyệt / vừa xác thực, hãy tải lại trang để làm mới phiên rồi publish lại.");
-      }
     } finally {
       setBusy(null);
     }
-  }
-
-  // pendingEscrow thường vài giây; hỏi lại tới khi khác (mục 4.8).
-  function pollAfterPublish() {
-    let n = 0;
-    const tick = async () => {
-      n++;
-      const r = await api<Project>(`/projects/${p.id}`);
-      setProject(r);
-      if (r.status === "pendingEscrow" && n < 20) setTimeout(tick, 1500);
-      else if (r.status === "draft" && r.statusReason) toast.error(r.statusReason);
-    };
-    setTimeout(tick, 1200);
   }
 
   const pr = progress.data;
@@ -132,64 +114,26 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
         </Alert>
       )}
 
-      {p.status === "draft" && (
+      {p.status === "draft" && r && (
         <Card>
           <CardHeader>
-            <CardTitle>Checklist publish</CardTitle>
-            <CardDescription>Đủ hết mục dưới đây mới publish được. Publish sẽ khoá tiền ký quỹ từ ví.</CardDescription>
+            <CardTitle>Chi phí dự kiến</CardTitle>
+            <CardDescription>Checklist publish ghim ở đầu trang. Publish sẽ khoá tiền ký quỹ dưới đây từ ví.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {kyb.data && kyb.data.status !== "verified" && (
-              <div className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
-                <span className="flex items-center gap-2">
-                  <XOctagon className="size-4 text-amber-600" /> Xác minh doanh nghiệp: <StatusBadge entry={kybStatus(kyb.data.status)} />
-                </span>
-                <Button size="sm" variant="outline" asChild>
-                  <Link href="/doanh-nghiep/kyb">Khai hồ sơ</Link>
-                </Button>
-              </div>
-            )}
-            {r && (
-              <>
-                {r.warnings.map((w) => (
-                  <p key={w} className="flex items-center gap-2 text-sm text-amber-700">
-                    <AlertTriangle className="size-4" /> {READINESS_WARNING[w] ?? w}
-                  </p>
-                ))}
-                {r.missing.length === 0 ? (
-                  <p className="flex items-center gap-2 text-sm text-emerald-700">
-                    <CheckCircle2 className="size-4" /> Đã đủ điều kiện.
-                  </p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {r.missing.map((m) => (
-                      <li key={m} className="flex items-center gap-2 text-sm">
-                        <XOctagon className="size-4 text-destructive" /> {READINESS_LABEL[m] ?? m}
-                        {m === "video_dang_chuan_bi" && <span className="text-muted-foreground">({formatNumber(r.videoPreparingCount)} video)</span>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <KeyValue
-                  items={[
-                    ["Số câu một bài", `${formatNumber(r.questionCount)} câu thật + ${formatNumber(r.qualityGoldCount)} câu kiểm tra`],
-                    ["Câu vàng cho bài test", formatNumber(r.entranceGoldCount)],
-                    ["Thưởng / suất", `${formatVnd(p.rewardVnd)} × ${p.slots} suất`],
-                    ["Phí nền tảng", `${r.platformFeePercent}% (${formatVnd(r.platformFeePerPassVnd)} / bài đạt)`],
-                    ["Cổng link", p.allowLinkGateway ? `${formatVnd(p.gateUnitPriceVnd)} / nhãn khách, ngân sách ${formatVnd(p.gateBudgetVnd)}` : "Không bật"],
-                    ["Ký quỹ khi publish", <b key="e">{formatVnd(r.estimatedCostVnd)}</b>],
-                  ]}
-                />
-              </>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void act("publish", "Đã gửi publish — đang ký quỹ")} disabled={busy === "publish" || !r?.ready || (kyb.data && kyb.data.status !== "verified")}>
-                {busy === "publish" ? <Loader2 className="animate-spin" /> : <Rocket />} Publish dự án
-              </Button>
-              <Button variant="outline" onClick={() => onTab("cau-hinh")}>
-                Mở cấu hình
-              </Button>
-            </div>
+            <KeyValue
+              items={[
+                ["Số câu một bài", `${formatNumber(r.questionCount)} câu thật + ${formatNumber(r.qualityGoldCount)} câu kiểm tra`],
+                ["Câu vàng cho bài test", formatNumber(r.entranceGoldCount)],
+                ["Thưởng / suất", `${formatVnd(p.rewardVnd)} × ${p.slots} suất`],
+                ["Phí nền tảng", `${r.platformFeePercent}% (${formatVnd(r.platformFeePerPassVnd)} / bài đạt)`],
+                ["Cổng link", p.allowLinkGateway ? `${formatVnd(p.gateUnitPriceVnd)} / nhãn khách, ngân sách ${formatVnd(p.gateBudgetVnd)}` : "Không bật"],
+                ["Ký quỹ khi publish", <b key="e">{formatVnd(r.estimatedCostVnd)}</b>],
+              ]}
+            />
+            <Button variant="outline" onClick={() => onTab("cau-hinh")}>
+              Mở cấu hình
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -212,7 +156,7 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
             />
           </div>
           {pr && <Progress value={done} />}
-          {pr?.frozenAt && <p className="text-xs text-muted-foreground">Số liệu chốt ngày {formatDateTime(pr.frozenAt)} (dự án đã đóng lâu, dữ liệu vận hành đã dọn).</p>}
+          {pr?.frozenAt && <p className="text-xs text-muted-foreground">Số liệu chốt ngày {formatDateTime(pr.frozenAt)}.</p>}
           {(dist.data?.imbalanceWarnings ?? []).map((w, i) => (
             <Alert key={i}>
               <AlertTriangle />
@@ -335,6 +279,7 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
               ["Thưởng / suất", formatVnd(p.rewardVnd)],
               ["Số suất", String(p.slots)],
               ["Ngưỡng đạt", `${p.passThresholdPercent}% câu giống đa số + không sai câu kiểm tra`],
+              ["Lấp suất còn trống", p.fillSlotsMinPercent == null ? "Không" : `Có — bài giống đa số từ ${p.fillSlotsMinPercent}%, đúng hết câu kiểm tra`],
               ["Số câu", `${p.questionCount} câu`],
               ["Dạng gán nhãn", toolKindsText(p.toolKinds) || "—"],
               ["Hạn chót", formatDateTime(p.deadline)],

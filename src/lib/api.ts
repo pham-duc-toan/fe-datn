@@ -220,8 +220,8 @@ export function uploadToSignedUrl(url: string, file: Blob, onProgress?: (fractio
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
     };
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Tải lên thất bại (${xhr.status})`)));
-    xhr.onerror = () => reject(new Error("Không kết nối được kho file (kiểm tra CORS của MinIO)"));
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Tải file lên thất bại, thử lại sau.")));
+    xhr.onerror = () => reject(new Error("Không tải file lên được — kiểm tra kết nối mạng rồi thử lại."));
     xhr.send(file);
   });
 }

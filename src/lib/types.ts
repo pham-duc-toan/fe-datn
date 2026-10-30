@@ -112,6 +112,8 @@ export type Project = {
   slots: number;
   /** Ngưỡng t (%): tỉ lệ câu giống đa số tối thiểu để đạt. */
   passThresholdPercent: number;
+  /** Lấp suất còn trống bằng bài giống đa số nhất, từ mức % này. null = không lấp. */
+  fillSlotsMinPercent?: number | null;
   /** Số câu thật (không tính câu vàng). */
   questionCount: number;
   toolKinds: ToolKind[];
@@ -179,6 +181,8 @@ export type ProjectLimits = {
   participantMultiplier: number;
   maxQuestions: number;
   minRewardVnd: number;
+  /** Ngưỡng khớp mặc định theo loại công cụ (setting labeling.threshold.*). */
+  matchThresholds: Partial<Record<ToolKind, number>>;
 };
 
 export type Readiness = {
@@ -500,6 +504,8 @@ export type KybProfile = {
   address: string;
   hasLicense: boolean;
   licenseFileName: string | null;
+  /** Link xem giấy phép (sống ngắn) — chỉ chính chủ. */
+  licenseUrl?: string | null;
   rejectReason: string | null;
   submittedAt: string | null;
   reviewedAt: string | null;
@@ -513,6 +519,9 @@ export type IdentityVerification = {
   idNumberLast4: string | null;
   hasFront: boolean;
   hasBack: boolean;
+  /** Link xem ảnh đã tải (sống ngắn) — chỉ chính chủ. */
+  frontUrl?: string | null;
+  backUrl?: string | null;
   adult: boolean;
   rejectReason: string | null;
   submittedAt: string | null;
@@ -533,3 +542,17 @@ export type Template = {
   version: number;
   updatedAt: string;
 };
+
+/** Thẻ chủ đề (admin quản lý): hồ sơ kỹ năng và dự án lưu MÃ thẻ, gợi ý dự án khớp theo mã. */
+export type TagKind = "domain" | "language";
+export interface Tag {
+  id: string;
+  kind: TagKind;
+  code: string;
+  name: string;
+  /** Ẩn: không cho chọn mới, nơi đã gắn vẫn giữ. */
+  hidden: boolean;
+  /** Mã thẻ đích khi đã gộp; null = chưa gộp. */
+  mergedInto: string | null;
+  updatedAt: string;
+}

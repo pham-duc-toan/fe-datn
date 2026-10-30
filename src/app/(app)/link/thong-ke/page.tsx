@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,13 +10,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/common/page-header";
 import { Field, StatCard } from "@/components/common/misc";
 import { api } from "@/lib/api";
-import { daysAgo, formatNumber, formatVnd, isoDay, shortId } from "@/lib/format";
+import { daysAgo, formatNumber, formatVnd, isoDay } from "@/lib/format";
 import { GATE_OUTCOME } from "@/lib/labels";
 
 type Daily = { date: string; views: number; submits: number; paidClicks: number; estimatedRevenueVnd: number };
 type Group = { key: string; views: number; paidClicks: number; estimatedRevenueVnd: number };
 
-function GroupTable({ title, rows, label }: { title: string; rows: Group[]; label: (k: string) => string }) {
+/** Thống kê trả id link — hiện mã /g/… của link cho người dùng nhận ra. */
+function LinkCode({ id }: { id: string }) {
+  const q = useQuery({ queryKey: ["link", id], queryFn: () => api<{ code: string }>(`/links/${id}`), staleTime: 5 * 60 * 1000, retry: false });
+  if (!q.data) return <span className="text-muted-foreground">{q.isPending ? "…" : "Link đã xoá"}</span>;
+  return (
+    <Link href={`/link/${id}`} className="font-mono hover:underline">
+      /g/{q.data.code}
+    </Link>
+  );
+}
+
+function GroupTable({ title, rows, label }: { title: string; rows: Group[]; label: (k: string) => ReactNode }) {
   return (
     <Card>
       <CardHeader>
@@ -61,7 +73,7 @@ export default function GateStatsPage() {
     <>
       <PageHeader
         title="Thống kê cổng link"
-        description="Doanh thu là ước tính (trễ 1–2 giây); số chính thức ở ví."
+        description="Doanh thu ở đây là ước tính; số chính thức xem ở ví."
         actions={
           <div className="flex items-end gap-2">
             <Field label="Từ">
@@ -99,7 +111,7 @@ export default function GateStatsPage() {
         </CardContent>
       </Card>
       <div className="grid gap-6 lg:grid-cols-3">
-        <GroupTable title="Link nổi bật" rows={top.data ?? []} label={(k) => shortId(k)} />
+        <GroupTable title="Link nổi bật" rows={top.data ?? []} label={(k) => <LinkCode id={k} />} />
         <GroupTable title="Nguồn truy cập" rows={sources.data ?? []} label={(k) => k || "(truy cập trực tiếp)"} />
         <GroupTable title="Kết cục lượt vượt" rows={outcomes.data ?? []} label={(k) => GATE_OUTCOME[k] ?? k} />
       </div>

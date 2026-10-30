@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/common/page-header";
 import { ActionDialog } from "@/components/common/action-dialog";
 import { KeyValue } from "@/components/common/misc";
+import { SignedImage } from "@/components/common/signed-image";
 import { Pager } from "@/components/common/pager";
 import { Loading, QueryState } from "@/components/common/states";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -59,8 +60,7 @@ function Detail({ id, onDone }: { id: string; onDone: () => void }) {
           <div key={label} className="space-y-1">
             <p className="text-sm font-medium">{label}</p>
             {url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={url} alt={label ?? ""} className="w-full rounded border" onError={() => void q.refetch()} />
+              <SignedImage src={url} alt={label ?? ""} className="w-full rounded border" onExpired={() => void q.refetch()} />
             ) : (
               <p className="text-sm text-muted-foreground">Không có ảnh</p>
             )}

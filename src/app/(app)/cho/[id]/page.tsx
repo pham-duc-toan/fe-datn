@@ -18,6 +18,7 @@ import { ActionDialog } from "@/components/common/action-dialog";
 import { StatusBadge } from "@/components/common/status-badge";
 import { ErrorState, Loading } from "@/components/common/states";
 import { useProject } from "@/components/project/use-project";
+import { useTags } from "@/hooks/use-tags";
 import { api, ApiError, del, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatVnd } from "@/lib/format";
@@ -37,6 +38,7 @@ export default function LabelerProjectPage() {
   const slots = useQuery({ queryKey: ["slots", id], queryFn: () => api<Slots>(`/tasks/projects/${id}/slots`), retry: false });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const { name: tagName } = useTags();
 
   if (q.isPending) return <Loading />;
   if (q.error) return <ErrorState error={q.error} />;
@@ -141,7 +143,13 @@ export default function LabelerProjectPage() {
                   ["Số câu", `${p.questionCount} câu`],
                   ["Dạng gán nhãn", toolKindsText(p.toolKinds) || "—"],
                   ["Điều kiện đạt", `Giống đa số ≥ ${p.passThresholdPercent}% và không sai câu kiểm tra`],
-                  ["Suất thưởng", `${p.slots} bài đạt nộp sớm nhất được thưởng`],
+                  [
+                    "Suất thưởng",
+                    p.fillSlotsMinPercent == null
+                      ? `${p.slots} bài đạt nộp sớm nhất được thưởng`
+                      : `${p.slots} bài đạt nộp sớm nhất được thưởng; còn suất trống thì trao cho bài giống đa số nhất (từ ${p.fillSlotsMinPercent}%, đúng hết câu kiểm tra)`,
+                  ],
+                  ["Chủ đề", p.domains.map((c) => tagName("domain", c)).concat(p.languages.map((c) => tagName("language", c))).join(" · ") || "—"],
                   ["Chỗ làm bài", slots.data ? `còn ${slots.data.available} / ${slots.data.maxParticipants || p.slots} (${slots.data.submitted} đã nộp)` : "—"],
                   ["Hạn chót", formatDateTime(p.deadline)],
                   ["Cấp độ tối thiểu", p.minLevel ?? "Không"],

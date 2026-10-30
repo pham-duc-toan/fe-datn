@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { PageHeader } from "@/components/common/page-header";
 import { ActionDialog } from "@/components/common/action-dialog";
 import { KeyValue } from "@/components/common/misc";
+import { SignedImage } from "@/components/common/signed-image";
 import { Pager } from "@/components/common/pager";
 import { Loading, QueryState } from "@/components/common/states";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -25,8 +26,8 @@ import { useUrlPage, useUrlState } from "@/lib/use-url-state";
 type Row = { profile: KybProfile; email: string; displayName: string; accountStatus: string; licenseUrl: string | null };
 
 function Detail({ id, onDone }: { id: string; onDone: () => void }) {
-  // Link xem giấy phép hết hạn sau 5 phút — tự lấy link mới mỗi 4 phút, khỏi phải bấm.
-  const q = useQuery({ queryKey: ["kyb-admin", id], queryFn: () => api<Row>(`/kyb/admin/${id}`), refetchInterval: 4 * 60 * 1000, refetchIntervalInBackground: false });
+  // Link xem giấy phép hết hạn sau 5 phút — tự lấy link mới mỗi 4 phút và khi ảnh tải lỗi, không cần nút bấm.
+  const q = useQuery({ queryKey: ["kyb-admin", id], queryFn: () => api<Row>(`/kyb/admin/${id}`), refetchInterval: 4 * 60 * 1000 });
   if (q.isPending) return <Loading />;
   if (!q.data) return null;
   const r = q.data;
@@ -49,16 +50,10 @@ function Detail({ id, onDone }: { id: string; onDone: () => void }) {
         isPdf ? (
           <iframe src={url} className="h-[60vh] w-full rounded border" title="Giấy phép" />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="Giấy phép" className="w-full rounded border" onError={() => void q.refetch()} />
+          <SignedImage src={url} alt="Giấy phép" className="w-full rounded border" onExpired={() => void q.refetch()} />
         )
       ) : (
         <p className="text-sm text-muted-foreground">Không có giấy phép.</p>
-      )}
-      {url && (
-        <Button variant="outline" size="sm" onClick={() => void q.refetch()}>
-          Tải lại giấy phép
-        </Button>
       )}
       {r.profile.status === "submitted" && (
         <div className="flex gap-2">

@@ -13,7 +13,8 @@ import { useAuth } from "@/components/providers/auth-provider";
 
 export default function VerifyEmailPage() {
   const token = useSearchParams().get("token") ?? "";
-  const { forceRefresh } = useAuth();
+  // status bắt đầu là "loading" ở cả server lẫn client → href giống nhau lúc hydrate (không đọc localStorage khi render).
+  const { forceRefresh, status } = useAuth();
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   const [error, setError] = useState("");
   const ran = useRef(false);
@@ -50,7 +51,7 @@ export default function VerifyEmailPage() {
       </CardHeader>
       <CardContent>
         <Button asChild className="w-full">
-          <Link href={readTokens() ? "/tong-quan" : "/dang-nhap"}>Tiếp tục</Link>
+          <Link href={status === "authed" ? "/tong-quan" : "/dang-nhap"}>Tiếp tục</Link>
         </Button>
       </CardContent>
     </Card>

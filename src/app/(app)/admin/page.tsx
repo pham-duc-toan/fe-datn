@@ -126,7 +126,7 @@ export default function AdminHome() {
           <Card>
             <CardHeader>
               <CardTitle>Hàng đợi lỗi (DLQ)</CardTitle>
-              <CardDescription>{ops.data?.reachable === false ? "Không đọc được RabbitMQ" : `Ngưỡng cảnh báo ${ops.data?.threshold ?? "—"}`}</CardDescription>
+              <CardDescription>{ops.data?.reachable === false ? "Không đọc được trạng thái hàng đợi" : `Ngưỡng cảnh báo ${ops.data?.threshold ?? "—"}`}</CardDescription>
             </CardHeader>
             <CardContent className="text-sm">
               {dlqBad.length === 0 ? (

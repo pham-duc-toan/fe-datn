@@ -15,16 +15,33 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Field, Markdown } from "@/components/common/misc";
+import { TagPicker } from "@/components/common/tag-picker";
 import { api, put } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatVnd } from "@/lib/format";
-import { VISIBILITY_LABEL } from "@/lib/labels";
-import type { Guideline, LabelSchema, Project, Readiness, Visibility } from "@/lib/types";
+import { TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
+import type { Guideline, LabelSchema, Project, Readiness, ToolKind, Visibility } from "@/lib/types";
 import { SchemaEditor } from "./schema-editor";
 import { useSetProject } from "./use-project";
 
 /** Công cụ dùng được trên cổng link — mặc định của setting gate.allowed_tools (mục 17.5). */
 const GATE_TOOLS = ["classification", "pairwise", "number", "bbox", "keypoint", "span"];
+
+/** Văn bản điền sẵn khi bật cảnh báo nội dung / NDA — doanh nghiệp sửa lại cho đúng dự án. */
+const DEFAULT_CONTENT_WARNING =
+  "Dự án có thể chứa hình ảnh / nội dung nhạy cảm (bạo lực, máu me, nội dung người lớn hoặc gây khó chịu). Chỉ tham gia nếu bạn đủ tuổi và chấp nhận xem các nội dung này; bạn có thể rời dự án bất kỳ lúc nào.";
+
+function defaultNda(projectName: string): string {
+  return [
+    `THOẢ THUẬN BẢO MẬT — DỰ ÁN “${projectName.trim() || "…"}”`,
+    "",
+    "1. Toàn bộ dữ liệu, tài liệu hướng dẫn và kết quả gán nhãn của dự án là thông tin bảo mật thuộc sở hữu của chủ dự án.",
+    "2. Tôi chỉ dùng dữ liệu để thực hiện công việc gán nhãn trên nền tảng; không sao chép, chụp, tải về, chia sẻ hay công bố dưới bất kỳ hình thức nào.",
+    "3. Tôi không tìm cách nhận diện cá nhân hay tổ chức xuất hiện trong dữ liệu.",
+    "4. Nghĩa vụ bảo mật vẫn còn hiệu lực sau khi dự án kết thúc hoặc khi tôi rời dự án.",
+    "5. Vi phạm thoả thuận có thể dẫn tới việc bị khoá tài khoản, không được trả thưởng và chịu trách nhiệm theo quy định pháp luật.",
+  ].join("\n");
+}
 
 function toLocal(iso: string | null): string {
   if (!iso) return "";
@@ -87,17 +104,18 @@ export function ConfigTab({ project: p }: { project: Project }) {
     rewardVnd: String(p.rewardVnd || ""),
     slots: String(p.slots || ""),
     passThresholdPercent: p.passThresholdPercent || 0,
+    fill: p.fillSlotsMinPercent != null,
+    fillMin: p.fillSlotsMinPercent ?? 50,
     deadline: toLocal(p.deadline),
   });
   const [ch, setCh] = useState({ allowProfessional: p.allowProfessional, allowLinkGateway: p.allowLinkGateway, allowCollaborative: p.allowCollaborative });
   const [gate, setGate] = useState({ unit: p.gateUnitPriceVnd ? String(p.gateUnitPriceVnd) : "", budget: p.gateBudgetVnd ? String(p.gateBudgetVnd) : "" });
   const [el, setEl] = useState({ minLevel: p.minLevel?.toString() ?? "", minReputation: p.minReputation?.toString() ?? "", requireEntranceTest: p.requireEntranceTest, entranceQuestionCount: String(p.entranceQuestionCount), entrancePassPercent: String(p.entrancePassPercent) });
   const [prot, setProt] = useState({ sensitiveContent: p.sensitiveContent, contentWarning: p.contentWarning ?? "", ndaRequired: p.ndaRequired, ndaText: "", requireVerifiedIdentity: p.requireVerifiedIdentity });
-  const [tags, setTags] = useState({ domains: p.domains.join(", "), languages: p.languages.join(", ") });
+  const [tags, setTags] = useState({ domains: p.domains, languages: p.languages });
   const [retention, setRetention] = useState(p.deleteFilesAfterClose);
 
   const nonGate = schema.tools.filter((t) => !GATE_TOOLS.includes(t.kind) || (t.kind === "classification" && t.allowMultiple));
-  const split = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
   const reward = Number(price.rewardVnd) || 0;
   const slots = Number(price.slots) || 0;
   const feePct = rdy.data?.platformFeePercent ?? p.platformFeePercent ?? 0;
@@ -106,6 +124,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
   const tMin = lim?.passThresholdMin ?? 60;
   const tMax = lim?.passThresholdMax ?? 95;
   const t = price.passThresholdPercent || Math.round((tMin + tMax) / 2);
+  const fillMin = Math.min(price.fillMin, t);
 
   return (
     <div className="space-y-6">
@@ -133,8 +152,8 @@ export function ConfigTab({ project: p }: { project: Project }) {
         </Field>
       </SaveCard>
 
-      <SaveCard title="Tập nhãn" description="Mỗi công cụ là một câu hỏi trên màn hình gán nhãn, theo đúng thứ tự." onSave={() => save("/label-schema", { ...schema, modality: p.modality })} disabled={!draft}>
-        <SchemaEditor modality={p.modality} value={schema} onChange={setSchema} projectName={name} />
+      <SaveCard title="Tập nhãn" onSave={() => save("/label-schema", { ...schema, modality: p.modality })} disabled={!draft}>
+        <SchemaEditor modality={p.modality} value={schema} onChange={setSchema} projectName={name} thresholds={lim?.matchThresholds} />
       </SaveCard>
 
       <SaveCard title="Hướng dẫn gán nhãn" description="Markdown; hiển thị cho labeler trước khi làm. Ví dụ đúng / sai giúp labeler hiểu nhanh." onSave={() => save("/guideline", guide)} disabled={!draft}>
@@ -158,16 +177,15 @@ export function ConfigTab({ project: p }: { project: Project }) {
             </Button>
           </div>
           {guide.examples.map((ex, i) => (
-            <div key={i} className="grid gap-2 rounded-md border p-2 sm:grid-cols-[1fr_1fr_auto_auto]">
-              <Input placeholder="sampleId (tuỳ chọn)" value={ex.sampleId ?? ""} onChange={(e) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, sampleId: e.target.value || null } : x)) })} />
-              <Input placeholder="Nhãn" value={ex.label ?? ""} onChange={(e) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)) })} />
+            <div key={i} className="grid gap-2 rounded-md border p-2 sm:grid-cols-[1fr_auto_auto]">
+              <Input placeholder="Nhãn (vd: ô tô)" value={ex.label ?? ""} onChange={(e) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)) })} />
               <label className="flex items-center gap-1.5 text-sm">
                 <Checkbox checked={ex.isCorrect} onCheckedChange={(c) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, isCorrect: c === true } : x)) })} /> Đúng
               </label>
               <Button type="button" size="icon-sm" variant="ghost" onClick={() => setGuide({ ...guide, examples: guide.examples.filter((_, k) => k !== i) })}>
                 <Trash2 />
               </Button>
-              <Input className="sm:col-span-4" placeholder="Giải thích" value={ex.explanation ?? ""} onChange={(e) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, explanation: e.target.value } : x)) })} />
+              <Input className="sm:col-span-3" placeholder="Giải thích" value={ex.explanation ?? ""} onChange={(e) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, explanation: e.target.value } : x)) })} />
             </div>
           ))}
         </div>
@@ -182,6 +200,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
             rewardVnd: reward,
             slots,
             passThresholdPercent: t,
+            fillSlotsMinPercent: price.fill ? fillMin : null,
             deadline: price.deadline ? new Date(price.deadline).toISOString() : null,
           })
         }
@@ -226,6 +245,19 @@ export function ConfigTab({ project: p }: { project: Project }) {
             className="max-w-md py-2"
           />
         </Field>
+        <div className="space-y-3 rounded-md border p-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <Switch checked={price.fill} onCheckedChange={(v) => setPrice({ ...price, fill: v })} disabled={!draft} /> Lấp suất còn trống
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Khi số bài đạt ít hơn số suất, các suất còn lại được trao cho những bài giống đa số nhiều nhất (cùng tỉ lệ thì bài nộp sớm hơn được trước). Bài vẫn phải đúng hết câu kiểm tra.
+          </p>
+          {price.fill && (
+            <Field label={`Giống đa số tối thiểu để được lấp suất: ${fillMin}%`} hint={`Từ 0% đến ngưỡng đạt (${t}%). Bài dưới mức này không được thưởng dù còn suất.`}>
+              <Slider min={0} max={t} step={1} value={[fillMin]} onValueChange={(v) => setPrice({ ...price, fillMin: v[0] })} disabled={!draft} className="max-w-md py-2" />
+            </Field>
+          )}
+        </div>
       </SaveCard>
 
       <SaveCard
@@ -243,7 +275,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
             <Alert variant="destructive">
               <AlertTriangle />
               <AlertDescription>
-                Cổng link chỉ nhận công cụ làm nhanh ({GATE_TOOLS.join(", ")}). Công cụ không hợp: {nonGate.map((t) => t.name).join(", ")} — publish sẽ bị chặn. Cổng còn cần câu vàng kiểm tra chất lượng.
+                Cổng link chỉ nhận công cụ làm nhanh ({GATE_TOOLS.map((k) => TOOL_LABEL[k as ToolKind]).join(", ")}). Công cụ không hợp: {nonGate.map((t) => (t.kind === "classification" ? `${TOOL_LABEL[t.kind]} chọn nhiều lớp` : TOOL_LABEL[t.kind])).join(", ")} — publish sẽ bị chặn. Cổng còn cần câu vàng kiểm tra chất lượng.
               </AlertDescription>
             </Alert>
           ) : ch.allowLinkGateway ? (
@@ -327,7 +359,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         }}
       >
         <label className="flex items-center gap-2 text-sm">
-          <Switch checked={prot.sensitiveContent} onCheckedChange={(v) => setProt({ ...prot, sensitiveContent: v })} /> Nội dung nhạy cảm
+          <Switch checked={prot.sensitiveContent} onCheckedChange={(v) => setProt({ ...prot, sensitiveContent: v, contentWarning: v && !prot.contentWarning.trim() ? DEFAULT_CONTENT_WARNING : prot.contentWarning })} /> Nội dung nhạy cảm
         </label>
         {prot.sensitiveContent && (
           <Field label="Cảnh báo nội dung">
@@ -335,11 +367,11 @@ export function ConfigTab({ project: p }: { project: Project }) {
           </Field>
         )}
         <label className="flex items-center gap-2 text-sm">
-          <Switch checked={prot.ndaRequired} onCheckedChange={(v) => setProt({ ...prot, ndaRequired: v })} /> Yêu cầu ký thoả thuận bảo mật (NDA)
+          <Switch checked={prot.ndaRequired} onCheckedChange={(v) => setProt({ ...prot, ndaRequired: v, ndaText: v && !prot.ndaText.trim() ? defaultNda(name) : prot.ndaText })} /> Yêu cầu ký thoả thuận bảo mật (NDA)
         </label>
         {prot.ndaRequired && (
-          <Field label="Văn bản NDA" hint={p.ndaVersion ? `Phiên bản hiện tại: ${p.ndaVersion}. Nhập lại văn bản để lưu.` : undefined}>
-            <Textarea rows={5} value={prot.ndaText} onChange={(e) => setProt({ ...prot, ndaText: e.target.value })} />
+          <Field label="Văn bản NDA" hint={p.ndaVersion ? `Phiên bản hiện tại: ${p.ndaVersion}. Nhập lại văn bản để lưu.` : "Labeler phải đọc và đồng ý trước khi vào dự án."}>
+            <Textarea rows={8} value={prot.ndaText} onChange={(e) => setProt({ ...prot, ndaText: e.target.value })} />
           </Field>
         )}
         <label className="flex items-center gap-2 text-sm">
@@ -348,12 +380,16 @@ export function ConfigTab({ project: p }: { project: Project }) {
       </SaveCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <SaveCard title="Chủ đề (để gợi ý labeler)" onSave={() => save("/tags", { domains: split(tags.domains), languages: split(tags.languages) })}>
-          <Field label="Lĩnh vực" hint="Ngăn cách bằng dấu phẩy">
-            <Input value={tags.domains} onChange={(e) => setTags({ ...tags, domains: e.target.value })} />
+        <SaveCard
+          title="Chủ đề (để gợi ý labeler)"
+          description="Labeler có thẻ trùng với dự án sẽ thấy dự án trong mục gợi ý."
+          onSave={() => save("/tags", { domains: tags.domains, languages: tags.languages })}
+        >
+          <Field label="Lĩnh vực">
+            <TagPicker kind="domain" value={tags.domains} onChange={(v) => setTags({ ...tags, domains: v })} />
           </Field>
-          <Field label="Ngôn ngữ" hint="vd: vi, en">
-            <Input value={tags.languages} onChange={(e) => setTags({ ...tags, languages: e.target.value })} />
+          <Field label="Ngôn ngữ">
+            <TagPicker kind="language" value={tags.languages} onChange={(v) => setTags({ ...tags, languages: v })} />
           </Field>
         </SaveCard>
         <SaveCard title="Lưu trữ file" description="Đồng ý để hệ thống xoá file gốc khi dự án đóng quá hạn giữ." onSave={() => save("/retention", { deleteFilesAfterClose: retention })}>

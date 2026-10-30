@@ -45,7 +45,7 @@ export default function OpsPage() {
             <div>
               <CardTitle>Hàng đợi lỗi (DLQ)</CardTitle>
               <CardDescription>
-                {ops.data?.reachable === false ? "Không đọc được RabbitMQ management API." : `Kiểm lúc ${formatDateTime(ops.data?.checkedAt)} · vượt ${ops.data?.threshold ?? "—"} tin thì gửi email cảnh báo`}
+                {ops.data?.reachable === false ? "Không đọc được trạng thái hàng đợi." : `Kiểm lúc ${formatDateTime(ops.data?.checkedAt)} · vượt ${ops.data?.threshold ?? "—"} tin thì gửi email cảnh báo`}
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => void ops.refetch()}>
@@ -95,7 +95,7 @@ export default function OpsPage() {
             <ActionDialog
               trigger={<Button variant="outline">Tính lại mọi dự án</Button>}
               title="Tính lại mọi dự án?"
-              description="Chậm (~1 giây / dự án) — chỉ dùng sau khi đổi quality.ds_min_labels."
+              description="Chậm (~1 giây / dự án) — chỉ dùng sau khi đổi setting “Số nhãn tối thiểu cho Dawid-Skene”."
               onConfirm={async () => setOut(await post("/quality/admin/dawid-skene/run?full=true"))}
               successMessage="Đã chạy toàn bộ"
             />
@@ -120,7 +120,7 @@ export default function OpsPage() {
               <ActionDialog
                 trigger={<Button variant="outline" disabled={!projectId}><Archive /> Lưu trữ số liệu chất lượng</Button>}
                 title="Lưu trữ số liệu chất lượng?"
-                description="Nhãn thô ở quality-svc bị dọn; báo cáo giữ dạng bản chụp."
+                description="Nhãn thô dùng để chấm bị dọn; báo cáo chất lượng vẫn giữ."
                 onConfirm={async () => setOut(await post(`/quality/admin/projects/${projectId}/archive`))}
                 successMessage="Đã lưu trữ"
               />

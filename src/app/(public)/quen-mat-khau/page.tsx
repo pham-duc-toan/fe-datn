@@ -19,7 +19,7 @@ export default function ForgotPage() {
     <Card className="w-full max-w-md">
       <CardHeader>
         <CardTitle className="text-xl">Quên mật khẩu</CardTitle>
-        <CardDescription>Nhập email đã đăng ký, chúng tôi gửi link đặt lại mật khẩu (sống 30 phút).</CardDescription>
+        <CardDescription>Nhập email đã đăng ký, chúng tôi gửi link đặt lại mật khẩu (có hiệu lực 30 phút).</CardDescription>
       </CardHeader>
       <CardContent>
         {sent ? (

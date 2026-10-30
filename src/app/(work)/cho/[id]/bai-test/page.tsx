@@ -84,7 +84,7 @@ export default function EntranceTestPage() {
 
   return (
     <>
-      <PageHeader back={{ href: `/cho/${id}`, label: project.data?.name ?? "Dự án" }} title="Bài test đầu vào" description="Server chấm theo đáp án có sẵn và không bao giờ trả đáp án. Mỗi lần làm 30 phút, tối đa 3 lần." />
+      <PageHeader back={{ href: `/cho/${id}`, label: project.data?.name ?? "Dự án" }} title="Bài test đầu vào" description="Chấm tự động theo đáp án có sẵn; đáp án không được hiện. Mỗi lần làm 30 phút, tối đa 3 lần." />
       {result && (
         <Alert className="mb-6" variant={result.passed ? "default" : "destructive"}>
           {result.passed ? <CheckCircle2 /> : <XCircle />}

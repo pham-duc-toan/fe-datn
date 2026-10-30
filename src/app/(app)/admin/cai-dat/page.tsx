@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, RotateCcw, Save, Search, Zap } from "lucide-react";
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, History, RotateCcw, Save, Search, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/common/page-header";
@@ -18,8 +20,50 @@ import { UserName } from "@/components/common/user-name";
 import { api, put } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatDuration } from "@/lib/format";
+import { TOOL_LABEL } from "@/lib/labels";
+import type { ToolKind } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-type Setting = { key: string; name: string; group: string; type: string; unit: string; min: number | null; max: number | null; effect: string; description: string; choices: string[] | null; defaultValue: unknown; value: unknown; version: number; updatedAt: string | null; updatedBy: string | null };
+type Setting = { key: string; name: string; group: string; type: string; unit: string; min: number | null; max: number | null; effect: string; description: string; choices: string[] | null; multiple?: boolean; defaultValue: unknown; value: unknown; version: number; updatedAt: string | null; updatedBy: string | null };
+
+const PROVIDER_LABEL: Record<string, string> = { sandbox: "Cổng giả lập (sandbox)", vnpay: "VNPay", momo: "MoMo" };
+
+/** Nhãn hiển thị của một lựa chọn: tên công cụ / cổng nạp; mã event giữ nguyên. */
+function choiceLabel(key: string, c: string): string {
+  if (key === "gate.allowed_tools") return TOOL_LABEL[c as ToolKind] ?? c;
+  if (key === "payment.enabled_providers") return PROVIDER_LABEL[c] ?? c;
+  return c;
+}
+
+const splitList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
+
+/** Setting "chọn nhiều": giá trị là chuỗi "a,b,c" — hiện ô tick, giữ thứ tự của danh sách lựa chọn. */
+function MultiChoice({ s, value, onChange }: { s: Setting; value: string; onChange: (v: string) => void }) {
+  const [filter, setFilter] = useState("");
+  const chosen = new Set(splitList(value));
+  const all = s.choices ?? [];
+  // Giá trị cũ không còn trong danh sách vẫn hiện để bỏ tick được.
+  const extra = Array.from(chosen).filter((c) => !all.includes(c));
+  const list = all.concat(extra).filter((c) => !filter || `${c} ${choiceLabel(s.key, c)}`.toLowerCase().includes(filter.toLowerCase()));
+  const toggle = (c: string, on: boolean) => {
+    const next = all.concat(extra).filter((x) => (x === c ? on : chosen.has(x)));
+    onChange(next.join(","));
+  };
+  return (
+    <div className="space-y-1.5 rounded-md border p-2">
+      {all.length > 12 && <Input className="h-7 text-xs" placeholder="Lọc lựa chọn" value={filter} onChange={(e) => setFilter(e.target.value)} />}
+      <div className={cn("grid gap-1", all.length > 12 && "max-h-56 overflow-y-auto pr-1")}>
+        {list.map((c) => (
+          <label key={c} className="flex items-center gap-2 text-sm">
+            <Checkbox checked={chosen.has(c)} onCheckedChange={(v) => toggle(c, v === true)} />
+            <span className={cn(choiceLabel(s.key, c) === c && "font-mono text-xs")}>{choiceLabel(s.key, c)}</span>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">Đã chọn {chosen.size}{all.length ? `/${all.length}` : ""}</p>
+    </div>
+  );
+}
 
 const HIGHLIGHT = new Set(["project.auto_approve", "annotation.auto_approve_agreed", "ledger.withdraw_auto_approve", "ledger.withdraw_auto_approve_max_vnd", "payment.manual_transfer_enabled", "payment.manual_transfer_auto_approve_max_vnd", "fee.platform_percent"]);
 
@@ -27,6 +71,7 @@ function show(v: unknown, s: Setting): string {
   if (v === null || v === undefined) return "—";
   if (s.type === "durationSeconds" && typeof v === "number") return formatDuration(v);
   if (typeof v === "boolean") return v ? "Bật" : "Tắt";
+  if (s.multiple && typeof v === "string") return splitList(v).map((c) => choiceLabel(s.key, c)).join(", ") || "(trống)";
   return typeof v === "string" ? v : JSON.stringify(v);
 }
 
@@ -137,6 +182,8 @@ function Row({ s }: { s: Setting }) {
         <div className="flex-1 space-y-1.5">
           {s.type === "bool" ? (
             <Switch checked={draft === "true"} onCheckedChange={(v) => setDraft(String(v))} />
+          ) : s.multiple ? (
+            <MultiChoice s={s} value={draft} onChange={setDraft} />
           ) : s.choices ? (
             <Select value={draft} onValueChange={setDraft}>
               <SelectTrigger className="w-full">
@@ -187,6 +234,8 @@ function Row({ s }: { s: Setting }) {
 export default function SettingsPage() {
   const q = useQuery({ queryKey: ["settings"], queryFn: () => api<Setting[]>("/admin/settings") });
   const [search, setSearch] = useState("");
+  // Nhóm đang thu gọn; mặc định mở hết. Đang tìm kiếm thì luôn mở để thấy kết quả.
+  const [closed, setClosed] = useState<Set<string>>(new Set());
   const groups = useMemo(() => {
     const m = new Map<string, Setting[]>();
     for (const s of q.data ?? []) {
@@ -195,6 +244,13 @@ export default function SettingsPage() {
     }
     return Array.from(m.entries());
   }, [q.data, search]);
+  const setOpen = (g: string, open: boolean) =>
+    setClosed((old) => {
+      const next = new Set(old);
+      if (open) next.delete(g);
+      else next.add(g);
+      return next;
+    });
 
   return (
     <>
@@ -202,27 +258,48 @@ export default function SettingsPage() {
         title="Cài đặt hệ thống"
         description="Mọi con số nghiệp vụ sửa được lúc đang chạy; có hiệu lực cho thao tác mới."
         actions={
-          <div className="relative">
-            <Search className="absolute top-2 left-2 size-4 text-muted-foreground" />
-            <Input className="w-72 pl-8" placeholder="Tìm theo khoá / mô tả" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
+          <>
+            <Button variant="outline" size="sm" onClick={() => setClosed(new Set())}>
+              <ChevronsUpDown /> Mở hết
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setClosed(new Set(groups.map(([g]) => g)))}>
+              <ChevronsDownUp /> Thu gọn hết
+            </Button>
+            <div className="relative">
+              <Search className="absolute top-2 left-2 size-4 text-muted-foreground" />
+              <Input className="w-72 pl-8" placeholder="Tìm theo khoá / mô tả" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </>
         }
       />
       <QueryState query={q}>
         {() => (
-          <div className="space-y-6">
-            {groups.map(([g, list]) => (
-              <Card key={g}>
-                <CardHeader>
-                  <CardTitle>{g}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {list.map((s) => (
-                    <Row key={`${s.key}-${s.version}`} s={s} />
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-4">
+            {groups.map(([g, list]) => {
+              const open = Boolean(search) || !closed.has(g);
+              return (
+                <Collapsible key={g} open={open} onOpenChange={(v) => setOpen(g, v)} asChild>
+                  <Card className="gap-0 py-0">
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="cursor-pointer py-4 select-none">
+                        <CardTitle className="flex items-center gap-2">
+                          <ChevronDown className={cn("size-4 transition-transform", !open && "-rotate-90")} />
+                          {g}
+                          <span className="text-sm font-normal text-muted-foreground">{list.length} mục</span>
+                        </CardTitle>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="border-t pb-2">
+                        {list.map((s) => (
+                          <Row key={`${s.key}-${s.version}`} s={s} />
+                        ))}
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              );
+            })}
           </div>
         )}
       </QueryState>

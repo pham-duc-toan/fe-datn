@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/common/page-header";
 import { Field } from "@/components/common/misc";
+import { FilePreview } from "@/components/common/file-preview";
 import { UserName } from "@/components/common/user-name";
 import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
@@ -33,6 +34,7 @@ export default function WatermarkPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Input type="file" accept="image/*,audio/*,video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <FilePreview file={file} className="mt-2" />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Rộng gốc (px)">
                 <Input type="number" value={w} onChange={(e) => setW(e.target.value)} />

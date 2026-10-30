@@ -17,7 +17,9 @@ import { MembersTab } from "@/components/project/members-tab";
 import { ResultsTab } from "@/components/project/results-tab";
 import { QualityTab } from "@/components/project/quality-tab";
 import { ReportsTab } from "@/components/project/reports-tab";
+import { PublishChecklist } from "@/components/project/publish-checklist";
 import { MODALITY_LABEL, projectStatus, VISIBILITY_LABEL } from "@/lib/labels";
+import { cn } from "@/lib/utils";
 
 const TABS = [
   ["tong-quan", "Tổng quan"],
@@ -48,10 +50,19 @@ export default function ProjectDetailPage() {
   const tabs = TABS.filter(([k]) => approved || !AFTER_APPROVAL.has(k));
   const asked = params.get("tab") ?? "tong-quan";
   const tab = tabs.some(([k]) => k === asked) ? asked : "tong-quan";
+  // Nháp: checklist publish ghim cạnh khối tên dự án, thấy được ở mọi tab trong lúc cấu hình.
+  const pinned = p.isOwner && p.status === "draft";
 
   return (
     <>
+      <div
+        className={cn(
+          pinned &&
+            "mb-5 grid gap-3 border-b bg-background/95 pb-3 backdrop-blur lg:sticky lg:top-14 lg:z-20 lg:-mx-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-stretch lg:px-6 lg:pt-3",
+        )}
+      >
       <PageHeader
+        className={pinned ? "mb-0 sm:items-start" : undefined}
         back={{ href: "/du-an", label: "Dự án của tôi" }}
         title={
           <span className="flex flex-wrap items-center gap-2">
@@ -67,6 +78,8 @@ export default function ProjectDetailPage() {
           )
         }
       />
+      {pinned && <PublishChecklist project={p} />}
+      </div>
       {!p.isOwner ? (
         <p className="text-sm text-muted-foreground">
           Bạn không phải chủ dự án này. <Link href={`/cho/${p.id}`} className="text-primary underline">Mở trang dự án</Link>.
