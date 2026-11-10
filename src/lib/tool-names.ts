@@ -30,12 +30,6 @@ export function autoToolName(projectName: string, kind: ToolKind, others: Pick<T
   }
 }
 
-/** Tên lô dữ liệu tự sinh = tên dự án + ngày giờ nạp (doanh nghiệp không phải đặt). */
-export function autoBatchName(projectName: string, d: Date = new Date()): string {
-  const p = (x: number) => String(x).padStart(2, "0");
-  return `${projectName.trim().slice(0, 60)} – ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 /** Quy tắc username giống backend (User.LoiUsername): 3–30 ký tự a-z 0-9 . _, không bắt đầu / kết thúc bằng . _ */
 export function usernameError(raw: string): string | null {
   const s = raw.trim().replace(/^@/, "").toLowerCase();

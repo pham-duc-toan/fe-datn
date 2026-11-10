@@ -30,9 +30,11 @@ export type WorkspaceProps = {
   onMediaError?: () => void;
   /** Gọn cho trang vượt link: chỉ cột công cụ dưới mẫu. */
   stacked?: boolean;
+  /** Màn luyện tập: làm nổi ô công cụ của nhiệm vụ đang làm. */
+  highlightTool?: string;
 };
 
-export function Workspace({ schema, modality, fileUrl, content, metadata, value, onChange, readOnly = false, seed, onMediaError, stacked }: WorkspaceProps) {
+export function Workspace({ schema, modality, fileUrl, content, metadata, value, onChange, readOnly = false, seed, onMediaError, stacked, highlightTool }: WorkspaceProps) {
   const tools = schema.tools;
   const spatial = tools.filter((t) => isList(t) && t.kind !== "relation");
   const [activeTool, setActiveTool] = useState<string | null>(readOnly ? null : spatial[0]?.name ?? null);
@@ -231,7 +233,15 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, value,
         );
     }
     return (
-      <div key={t.name} className={cn("rounded-lg border bg-card p-3", activeTool === t.name && "ring-2 ring-primary/40")}>
+      <div
+        key={t.name}
+        data-tool={t.name}
+        className={cn(
+          "rounded-lg border bg-card p-3 transition-shadow",
+          activeTool === t.name && "ring-2 ring-primary/40",
+          highlightTool === t.name && "ring-2 ring-amber-400 shadow-[0_0_0_6px_rgb(251_191_36_/_0.25)]",
+        )}
+      >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{t.name}</div>

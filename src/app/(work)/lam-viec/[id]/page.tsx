@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { BookOpen, ChevronLeft, ChevronRight, Eraser, Eye, Flag, FlagTriangleRight, Loader2, LogOut, Send, ShieldAlert, SkipForward, Timer } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Eraser, Eye, Flag, FlagTriangleRight, GraduationCap, Loader2, LogOut, Send, ShieldAlert, SkipForward, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,16 +14,20 @@ import { Markdown } from "@/components/common/misc";
 import { ActionDialog } from "@/components/common/action-dialog";
 import { ErrorState, Loading } from "@/components/common/states";
 import { Workspace } from "@/components/labeling/workspace";
+import { PracticeSession } from "@/components/tutorial/practice-session";
+import { SpotlightTour, type TourStep } from "@/components/tutorial/spotlight-tour";
+import { markLearned, markTourDone, readTutorial, unlearnedKinds } from "@/components/tutorial/tutorial-store";
 import { buildPayload, initialData, isBlank, validateLabel } from "@/components/labeling/schema";
 import { useProject } from "@/components/project/use-project";
 import { hasFreeText, schemaToolKinds } from "@/components/project/free-text-notice";
-import { ApiError, api, post, put } from "@/lib/api";
+import { ApiError, api, post } from "@/lib/api";
+import { clearDraft, readDraft, writeDraftAnswer } from "@/lib/attempt-draft";
 import { errorMessage } from "@/lib/errors";
 import { deviceId } from "@/lib/device";
 import { formatVnd } from "@/lib/format";
 import { REPORT_REASON } from "@/lib/labels";
 import { cn } from "@/lib/utils";
-import type { Attempt, InvalidAnswer, LabelData, SaveAnswerResponse, SubmitAttemptResponse } from "@/lib/types";
+import type { Attempt, InvalidAnswer, LabelData, SubmitAttemptResponse, ToolKind } from "@/lib/types";
 
 /** Đếm ngược tới hạn nộp của bài. */
 function Countdown({ to }: { to: string }) {
@@ -36,7 +40,7 @@ function Countdown({ to }: { to: string }) {
   const h = Math.floor(left / 3600);
   const m = Math.floor((left % 3600) / 60);
   return (
-    <span className={cn("flex items-center gap-1.5 font-mono text-sm tabular-nums", left < 600 ? "font-semibold text-destructive" : "text-muted-foreground")} title="Thời gian còn lại để nộp bài">
+    <span data-tour="dong-ho" className={cn("flex items-center gap-1.5 font-mono text-sm tabular-nums", left < 600 ? "font-semibold text-destructive" : "text-muted-foreground")} title="Thời gian còn lại để nộp bài">
       <Timer className="size-4" /> {h > 0 ? `${h}:${String(m).padStart(2, "0")}` : m}:{String(left % 60).padStart(2, "0")}
     </span>
   );
@@ -44,18 +48,28 @@ function Countdown({ to }: { to: string }) {
 
 type Answers = Record<string, LabelData>;
 
-/** Câu đã có câu trả lời (đã lưu trên server, hoặc vừa sửa mà còn nội dung). */
-function answeredSet(a: Attempt, local: Answers, touched: Set<string>): Set<string> {
+/** Câu đã có câu trả lời (theo nháp trên máy — backend không giữ nháp). */
+function answeredSet(a: Attempt, local: Answers): Set<string> {
   const s = new Set<string>();
   for (const q of a.questions) {
-    if (touched.has(q.sampleId)) {
-      if (!isBlank(a.labelSchema, local[q.sampleId] ?? {})) s.add(q.sampleId);
-    } else if (q.answer) s.add(q.sampleId);
+    if (!isBlank(a.labelSchema, local[q.sampleId] ?? {})) s.add(q.sampleId);
   }
   return s;
 }
 
 const FLAG_KEY = (aid: string) => `crowd:attempt-flags:${aid}`;
+
+/** Tour giới thiệu trang làm bài (sau màn luyện tập) — mỗi điểm dừng là một phần tử `data-tour`. */
+const TOUR: TourStep[] = [
+  { target: "danh-sach-cau", title: "Danh sách câu hỏi", body: "Bấm số để nhảy tới câu bất kỳ, làm theo thứ tự tuỳ ý. Ô xanh là câu đã trả lời, chấm vàng là câu bạn đánh dấu xem lại, viền đỏ là câu chưa hợp lệ." },
+  { target: "khu-gan-nhan", title: "Khu gán nhãn", body: "Mẫu ở bên trái, các công cụ ở bên phải — giống hệt bài luyện tập vừa rồi." },
+  { target: "danh-dau", title: "Đánh dấu xem lại", body: "Chưa chắc câu nào thì đánh dấu để quay lại sau." },
+  { target: "bao-loi", title: "Báo lỗi câu", body: "Mẫu hỏng (không xem được, sai nội dung…) thì báo lỗi. Không bị trừ uy tín; câu bị báo sai nhiều sẽ được loại khỏi chấm." },
+  { target: "luu-nhap", title: "Nháp lưu trên máy", body: "Mọi câu trả lời tự lưu nháp ngay trên trình duyệt này. Đổi máy hoặc xoá dữ liệu trình duyệt thì mất nháp." },
+  { target: "dong-ho", title: "Thời gian còn lại", body: "Hết giờ mà chưa nộp thì bài bị huỷ và suất trả cho người khác." },
+  { target: "huong-dan", title: "Hướng dẫn của dự án", body: "Luật gán nhãn riêng của dự án — đọc kỹ trước khi làm. Bài được chấm theo độ giống đa số và các câu kiểm tra." },
+  { target: "nop-bai", title: "Nộp cả bài", body: "Làm xong thì nộp CẢ BÀI một lần — sau khi nộp không sửa được. Câu bỏ trống bị tính là không giống đa số." },
+];
 
 export default function ExamPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,14 +79,17 @@ export default function ExamPage() {
   const [error, setError] = useState<unknown>(null);
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
+  // Câu người dùng đã sửa trong phiên này — chỉ để hiện gợi ý lỗi sau khi sửa, không ảnh hưởng nháp.
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [flags, setFlags] = useState<Set<string>>(new Set());
   const [invalid, setInvalid] = useState<Record<string, string>>({});
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [storageBlocked, setStorageBlocked] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
-  const pending = useRef<{ sampleId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  // Hướng dẫn kiểu game: màn luyện tập (only = loại công cụ cần dạy, null = tất cả) rồi tour trang làm bài.
+  const [practice, setPractice] = useState<{ only: ToolKind[] | null; replay: boolean } | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
 
   // Chặn gọi "bắt đầu" hai lần cùng lúc (effect chạy lại / bấm thử lại khi đang tải).
   const loading = useRef(false);
@@ -97,7 +114,10 @@ export default function ExamPage() {
       }
       if (!a) return;
       setAttempt(a);
-      setAnswers(Object.fromEntries(a.questions.map((q) => [q.sampleId, initialData(a.labelSchema, q.answer)])));
+      // Nháp nằm trên máy (localStorage) — mở lại bài thì khôi phục từ đó.
+      const draft = readDraft(a.attemptId);
+      const restored: Answers = Object.fromEntries(a.questions.map((q) => [q.sampleId, initialData(a.labelSchema, draft[q.sampleId] ?? q.answer)]));
+      setAnswers(restored);
       setTouched(new Set());
       setReveal(!a.sensitiveContent);
       try {
@@ -106,8 +126,14 @@ export default function ExamPage() {
       } catch {
         setFlags(new Set());
       }
-      const firstBlank = a.questions.findIndex((q) => !q.answer);
+      const firstBlank = a.questions.findIndex((q) => isBlank(a.labelSchema, restored[q.sampleId] ?? {}));
       setIdx(firstBlank >= 0 ? firstBlank : 0);
+      // Lần đầu gặp công cụ nào thì luyện công cụ đó; đã học hết mà chưa xem tour thì chỉ xem tour.
+      if (a.state === "inProgress") {
+        const chuaHoc = unlearnedKinds(a.labelSchema.tools.map((t) => t.kind));
+        if (chuaHoc.length > 0) setPractice({ only: chuaHoc, replay: false });
+        else if (!readTutorial().tourDone) setTourOpen(true);
+      }
     } catch (e) {
       setError(e);
     } finally {
@@ -120,61 +146,24 @@ export default function ExamPage() {
     void load();
   }, [load]);
 
-  const save = useCallback(
-    async (sampleId: string) => {
-      if (!attempt) return;
-      const data = buildPayload(attempt.labelSchema, answers[sampleId] ?? {});
-      setSaving(true);
-      try {
-        const r = await put<SaveAnswerResponse>(`/tasks/attempts/${attempt.attemptId}/answers/${sampleId}`, {
-          data: Object.keys(data).length === 0 ? null : data,
-        });
-        setSavedAt(r.savedAt ?? new Date().toISOString());
-        setInvalid((m) => {
-          if (!(sampleId in m)) return m;
-          const n = { ...m };
-          delete n[sampleId];
-          return n;
-        });
-      } catch (e) {
-        toast.error(errorMessage(e));
-      } finally {
-        setSaving(false);
-      }
-    },
-    [attempt, answers],
-  );
-
-  /** Lưu ngay câu đang chờ (khi chuyển câu / nộp bài). */
-  const flush = useCallback(async () => {
-    const p = pending.current;
-    if (!p) return;
-    clearTimeout(p.timer);
-    pending.current = null;
-    await save(p.sampleId);
-  }, [save]);
-
-  // Tự lưu 1,2 giây sau lần sửa cuối của câu đang làm.
-  const latestSave = useRef(save);
-  useEffect(() => {
-    latestSave.current = save;
-  }, [save]);
-
+  /** Lưu nháp MỘT câu vào localStorage ngay khi sửa (không gọi API — nộp bài mới gửi cả bài). */
   function change(sampleId: string, v: LabelData) {
     setAnswers((m) => ({ ...m, [sampleId]: v }));
     setTouched((s) => (s.has(sampleId) ? s : new Set(s).add(sampleId)));
-    if (pending.current) clearTimeout(pending.current.timer);
-    pending.current = {
-      sampleId,
-      timer: setTimeout(() => {
-        pending.current = null;
-        void latestSave.current(sampleId);
-      }, 1200),
-    };
+    if (!attempt) return;
+    const blank = isBlank(attempt.labelSchema, v);
+    const ok = writeDraftAnswer(attempt.attemptId, sampleId, blank ? null : buildPayload(attempt.labelSchema, v));
+    setStorageBlocked(!ok);
+    if (ok) setSavedAt(new Date().toISOString());
+    setInvalid((m) => {
+      if (!(sampleId in m)) return m;
+      const n = { ...m };
+      delete n[sampleId];
+      return n;
+    });
   }
 
-  async function go(i: number) {
-    await flush();
+  function go(i: number) {
     setIdx(i);
     if (attempt?.sensitiveContent) setReveal(false);
   }
@@ -194,14 +183,20 @@ export default function ExamPage() {
     });
   }
 
-  const answered = useMemo(() => (attempt ? answeredSet(attempt, answers, touched) : new Set<string>()), [attempt, answers, touched]);
+  const answered = useMemo(() => (attempt ? answeredSet(attempt, answers) : new Set<string>()), [attempt, answers]);
 
   async function submit() {
     if (!attempt) return;
-    await flush();
     setBusy(true);
     try {
-      await post<SubmitAttemptResponse>(`/tasks/attempts/${attempt.attemptId}/submit`, {}, { headers: { "X-Device-Id": deviceId() } });
+      // Cả bài trong một request: mỗi câu đã trả lời (câu bỏ trống không gửi).
+      const body = {
+        answers: attempt.questions
+          .filter((q) => !isBlank(attempt.labelSchema, answers[q.sampleId] ?? {}))
+          .map((q) => ({ sampleId: q.sampleId, data: buildPayload(attempt.labelSchema, answers[q.sampleId] ?? {}) })),
+      };
+      await post<SubmitAttemptResponse>(`/tasks/attempts/${attempt.attemptId}/submit`, body, { headers: { "X-Device-Id": deviceId() } });
+      clearDraft(attempt.attemptId);
       try {
         localStorage.removeItem(FLAG_KEY(attempt.attemptId));
       } catch {
@@ -235,6 +230,27 @@ export default function ExamPage() {
     })();
   }, [attempt]);
 
+  /** Xong màn luyện tập: hoàn thành → sang tour; bỏ qua → bỏ cả hướng dẫn (như "Skip tutorial" trong game). */
+  const practiceDone = useCallback(
+    (finished: boolean) => {
+      if (!attempt) return;
+      markLearned(attempt.labelSchema.tools.map((t) => t.kind));
+      const replay = practice?.replay === true;
+      setPractice(null);
+      if (!finished) {
+        markTourDone();
+        return;
+      }
+      if (replay || !readTutorial().tourDone) setTourOpen(true);
+    },
+    [attempt, practice],
+  );
+
+  const tourDone = useCallback(() => {
+    markTourDone();
+    setTourOpen(false);
+  }, []);
+
   const p = project.data;
   const back = { href: `/cho/${id}`, label: p?.name ?? "Dự án" };
 
@@ -261,6 +277,14 @@ export default function ExamPage() {
   }
   if (!attempt) return <Loading label="Đang mở bài làm…" />;
 
+  if (practice)
+    return (
+      <>
+        <PageHeader back={back} title={p?.name ?? "Làm bài"} description="Luyện tập trên câu ví dụ trước khi vào bài thật" actions={<Countdown to={attempt.expiresAt} />} />
+        <PracticeSession schema={attempt.labelSchema} only={practice.only} onDone={practiceDone} />
+      </>
+    );
+
   const q = attempt.questions[idx];
   const value = answers[q.sampleId] ?? {};
   const hints = touched.has(q.sampleId) ? validateLabel(attempt.labelSchema, value, q.metadata) : [];
@@ -283,9 +307,12 @@ export default function ExamPage() {
         actions={
           <>
             <Countdown to={attempt.expiresAt} />
+            <Button variant="ghost" size="sm" onClick={() => setPractice({ only: null, replay: true })} title="Luyện tập lại các công cụ và xem tour trang làm bài">
+              <GraduationCap /> Xem lại hướng dẫn
+            </Button>
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" data-tour="huong-dan">
                   <BookOpen /> Hướng dẫn
                 </Button>
               </SheetTrigger>
@@ -302,7 +329,7 @@ export default function ExamPage() {
 
       <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
         {/* Bảng câu hỏi: nhảy tới câu bất kỳ, thấy ngay câu nào còn trống / cần xem lại / chưa hợp lệ. */}
-        <Card className="h-fit lg:sticky lg:top-4">
+        <Card className="h-fit lg:sticky lg:top-4" data-tour="danh-sach-cau">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">
               Đã trả lời {answered.size}/{attempt.questions.length}
@@ -337,7 +364,13 @@ export default function ExamPage() {
               <p><span className="mr-1 inline-block size-2.5 rounded-full bg-amber-500 align-middle" /> đánh dấu xem lại</p>
               <p><span className="mr-1 inline-block size-2.5 rounded-sm border border-destructive bg-destructive/10 align-middle" /> chưa hợp lệ</p>
             </div>
-            <p className="text-xs text-muted-foreground">{saving ? "Đang lưu…" : savedAt ? `Đã lưu lúc ${new Date(savedAt).toLocaleTimeString("vi-VN")}` : "Câu trả lời tự lưu sau mỗi thay đổi"}</p>
+            <p data-tour="luu-nhap" className={cn("text-xs", storageBlocked ? "text-destructive" : "text-muted-foreground")}>
+              {storageBlocked
+                ? "Trình duyệt không cho lưu nháp — đừng tải lại trang trước khi nộp"
+                : savedAt
+                  ? `Đã lưu nháp trên máy lúc ${new Date(savedAt).toLocaleTimeString("vi-VN")}`
+                  : "Câu trả lời lưu nháp trên máy này; nộp bài mới gửi lên"}
+            </p>
           </CardContent>
         </Card>
 
@@ -345,11 +378,12 @@ export default function ExamPage() {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold">Câu {idx + 1} / {attempt.questions.length}</h2>
             {answered.has(q.sampleId) ? <span className="text-xs text-emerald-700">đã trả lời</span> : <span className="text-xs text-muted-foreground">chưa trả lời</span>}
-            <Button variant="ghost" size="sm" className="ml-auto" onClick={() => toggleFlag(q.sampleId)}>
+            <Button variant="ghost" size="sm" className="ml-auto" data-tour="danh-dau" onClick={() => toggleFlag(q.sampleId)}>
               <FlagTriangleRight className={cn(flags.has(q.sampleId) && "text-amber-500")} /> {flags.has(q.sampleId) ? "Bỏ đánh dấu" : "Đánh dấu xem lại"}
             </Button>
           </div>
 
+          <div data-tour="khu-gan-nhan">
           {attempt.sensitiveContent && !reveal ? (
             <Card className="border-amber-300">
               <CardHeader>
@@ -378,6 +412,7 @@ export default function ExamPage() {
               onMediaError={onMediaError}
             />
           )}
+          </div>
 
           {invalid[q.sampleId] && (
             <Alert variant="destructive">
@@ -420,7 +455,7 @@ export default function ExamPage() {
               <Eraser /> Xoá câu trả lời
             </Button>
             <ActionDialog
-              trigger={<Button variant="ghost"><Flag /> Báo lỗi câu</Button>}
+              trigger={<Button variant="ghost" data-tour="bao-loi"><Flag /> Báo lỗi câu</Button>}
               title="Báo lỗi câu hỏi"
               description="Không bị trừ uy tín. Câu bị báo sai nhiều sẽ được loại khỏi chấm điểm."
               fields={[
@@ -446,7 +481,7 @@ export default function ExamPage() {
               />
               <ActionDialog
                 trigger={
-                  <Button disabled={busy}>
+                  <Button disabled={busy} data-tour="nop-bai">
                     {busy ? <Loader2 className="animate-spin" /> : <Send />} Nộp bài
                   </Button>
                 }
@@ -464,6 +499,7 @@ export default function ExamPage() {
           </div>
         </div>
       </div>
+      {tourOpen && <SpotlightTour steps={TOUR} onClose={tourDone} />}
     </>
   );
 }

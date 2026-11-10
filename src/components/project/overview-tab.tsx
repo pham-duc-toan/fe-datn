@@ -23,7 +23,6 @@ const ESCROW_STATE: Record<string, string> = { active: "đang giữ", closing: "
 import { useSetProject } from "./use-project";
 
 const CLOSE_REASON: Record<string, string> = {
-  chua_dong_bo_tam_dung: "Lệnh tạm dừng chưa tới hệ thống thu bài — thử lại sau vài giây.",
   da_co_bai_nop: "Đã có bài nộp — không huỷ được nữa. Dùng “Kết thúc sớm” để chấm các bài đã nộp và hoàn phần suất thừa.",
 };
 

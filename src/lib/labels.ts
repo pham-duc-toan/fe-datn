@@ -148,13 +148,14 @@ export const KYB_STATUS: Record<string, Entry> = {
 };
 export const kybStatus = (s: string | null | undefined) => pick(KYB_STATUS, s);
 
-export const DATASET_STATUS: Record<string, Entry> = {
-  pending: ["Chờ xử lý", "warning"],
-  ingesting: ["Đang nạp", "info"],
-  ready: ["Sẵn sàng", "success"],
-  failed: ["Thất bại", "danger"],
+/** Tiến trình nạp của một mẫu (sau khi file đã lên kho). "processing" gồm cả tải file từ nguồn ngoài. */
+export const INGEST_STATE: Record<string, Entry> = {
+  queued: ["Chờ xử lý", "warning"],
+  processing: ["Đang xử lý file", "info"],
+  ready: ["Đã xử lý", "success"],
+  failed: ["Lỗi", "danger"],
 };
-export const datasetStatus = (s: string | null | undefined) => pick(DATASET_STATUS, s);
+export const ingestState = (s: string | null | undefined) => pick(INGEST_STATE, s);
 
 export const LINK_STATUS: Record<string, Entry> = {
   pendingScan: ["Đang kiểm tra", "warning"],

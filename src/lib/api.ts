@@ -226,6 +226,44 @@ export function uploadToSignedUrl(url: string, file: Blob, onProgress?: (fractio
   });
 }
 
+/**
+ * POST multipart có Authorization và TIẾN ĐỘ GỬI (fetch không đo được) — dùng cho ZIP ảnh: thanh tiến độ chạy tới
+ * 100% khi byte cuối rời trình duyệt, rồi server mới giải nén / kiểm tra (đó là bước "đang xử lý").
+ * `onUploaded` gọi một lần khi đã gửi xong toàn bộ.
+ */
+export async function uploadForm<T = unknown>(
+  path: string,
+  form: FormData,
+  handlers: { onProgress?: (fraction: number) => void; onUploaded?: () => void } = {},
+): Promise<T> {
+  let tokens = readTokens();
+  if (tokens && tokens.expiresAt - Date.now() < 20_000) tokens = (await refreshTokens()) ?? tokens;
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", buildUrl(path));
+    if (tokens) xhr.setRequestHeader("Authorization", `Bearer ${tokens.accessToken}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && handlers.onProgress) handlers.onProgress(e.loaded / e.total);
+    };
+    xhr.upload.onload = () => handlers.onUploaded?.();
+    xhr.onload = () => {
+      let data: Record<string, unknown> = {};
+      try {
+        data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch {
+        data = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data as T);
+      else {
+        const h = xhr.getResponseHeader("Retry-After");
+        reject(new ApiError(xhr.status, data, h && !Number.isNaN(Number(h)) ? Number(h) : null));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Không tải file lên được — kiểm tra kết nối mạng rồi thử lại."));
+    xhr.send(form);
+  });
+}
+
 export function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }

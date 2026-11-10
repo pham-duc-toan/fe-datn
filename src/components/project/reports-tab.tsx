@@ -79,7 +79,7 @@ export function ReportsTab({ project: p }: { project: Project }) {
                       {REPORT_REASON[r.reason] ?? r.reason}
                       {r.note && <div className="text-xs text-muted-foreground">{r.note}</div>}
                     </TableCell>
-                    <TableCell>{r.reportsOnTask}</TableCell>
+                    <TableCell>{r.reportsOnSample}</TableCell>
                     <TableCell>{formatDateTime(r.createdAt)}</TableCell>
                     <TableCell>
                       <StatusBadge entry={genericStatus(r.state)} />

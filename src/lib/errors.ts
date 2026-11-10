@@ -204,7 +204,6 @@ const MESSAGES: Record<string, string> = {
   da_bi_chan: "Đã bị chặn.",
   da_co_cau_hoi_vang: "Mẫu đã có câu vàng.",
   chua_cau_hinh_google_drive: "Chưa hỗ trợ nhập từ Google Drive.",
-  chua_dong_bo_tam_dung: "Dự án đang được tạm dừng, thử lại sau vài giây.",
 };
 
 /** Câu có dấu tiếng Việt — backend viết thông báo cho người dùng bằng tiếng Việt có dấu. */

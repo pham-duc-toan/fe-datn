@@ -1,28 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CloudDownload, FileArchive, FileUp, Loader2, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, CloudDownload, FileArchive, FileUp, Loader2, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ImageThumb, ImageViewer } from "@/components/common/image-viewer";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Field } from "@/components/common/misc";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
-import { api, post } from "@/lib/api";
-import { autoBatchName } from "@/lib/tool-names";
-import { uploadToSignedUrl } from "@/lib/api";
+import { api, del, post, uploadForm, uploadToSignedUrl } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import { formatBytes, formatDateTime } from "@/lib/format";
-import { datasetStatus } from "@/lib/labels";
-import type { Dataset, Paged, Project, Sample } from "@/lib/types";
+import { formatBytes } from "@/lib/format";
+import { ingestState, type Tone } from "@/lib/labels";
+import type { IngestResult, IngestStatus, Paged, Project, Sample } from "@/lib/types";
 import { useUrlPage } from "@/lib/use-url-state";
 
 const ACCEPT: Record<string, string> = {
@@ -37,6 +35,89 @@ const ROW_HINT: Record<string, string> = {
   list: '{"prompt": "Câu hỏi (tuỳ chọn)", "items": ["mục 1", "mục 2", "mục 3"]}',
 };
 
+/** Số mẫu mỗi lần đăng ký / mỗi lần gửi dòng JSON (khớp dataset.manifest_inline_max_rows mặc định 1.000, file tối đa 100/lần xin link). */
+const FILES_PER_BATCH = 100;
+const ROWS_PER_REQUEST = 1000;
+const PARALLEL_UPLOADS = 3;
+
+/**
+ * Các chặng của MỘT file, theo đúng thứ tự người dùng thấy:
+ *   uploading (đẩy lên kho, có %) → registering (đang đăng ký) → queued (đã upload, xếp hàng chờ xử lý)
+ *   → processing (đang xử lý file: tải / đọc / đo thông tin) → preparing (video: chuẩn bị bản xem) → done (đã xử lý)
+ * hoặc failed ở bất kỳ chặng nào (kèm lý do).
+ */
+type Stage = "uploading" | "registering" | "queued" | "processing" | "preparing" | "done" | "failed";
+
+type Row = {
+  uid: string;
+  name: string;
+  size: number | null;
+  stage: Stage;
+  /** 0..1 — chỉ có nghĩa ở chặng uploading. */
+  progress: number;
+  /** Mã mẫu trên server sau khi đăng ký — để theo dõi tiếp bằng GET samples?ids=. */
+  sampleId?: string;
+  note?: string;
+  /** Nạp từ nguồn ngoài: chặng "xếp hàng" là chờ tải về chứ không phải chờ sau upload. */
+  external?: boolean;
+};
+
+const STAGE_TONE: Record<Stage, Tone> = {
+  uploading: "info",
+  registering: "info",
+  queued: "warning",
+  processing: "info",
+  preparing: "info",
+  done: "success",
+  failed: "danger",
+};
+
+function stageLabel(r: Row): string {
+  switch (r.stage) {
+    case "uploading":
+      return `Đang upload ${Math.round(r.progress * 100)}%`;
+    case "registering":
+      return "Đã upload — đang đăng ký";
+    case "queued":
+      return r.external ? "Chờ tải về và xử lý" : "Đã upload — chờ xử lý";
+    case "processing":
+      return "Đang xử lý file";
+    case "preparing":
+      return "Đang chuẩn bị video";
+    case "done":
+      return "Đã xử lý";
+    case "failed":
+      return "Lỗi";
+  }
+}
+
+const isPending = (r: Row) => r.sampleId !== undefined && (r.stage === "queued" || r.stage === "processing" || r.stage === "preparing");
+
+function stageFromSample(s: Sample): { stage: Stage; note?: string } {
+  if (s.ingestState === "failed") return { stage: "failed", note: s.ingestError ?? "Không xử lý được file." };
+  if (s.ingestState === "queued") return { stage: "queued" };
+  if (s.ingestState === "processing") return { stage: "processing" };
+  if (s.mediaState === "failed") return { stage: "failed", note: s.mediaError ?? "Video hỏng, không chuẩn bị được bản xem." };
+  if (s.mediaState === "preparing") return { stage: "preparing" };
+  return { stage: "done" };
+}
+
+function reasonFor(errors: string[], index: number): string {
+  return errors.find((e) => e.startsWith(`dòng ${index + 1}:`))?.replace(/^dòng \d+:\s*/, "") ?? "Bị bỏ qua (sai định dạng hoặc đã nạp trước đó).";
+}
+
+/** Chạy các việc với tối đa `limit` việc cùng lúc. */
+async function runPool(jobs: (() => Promise<void>)[], limit: number) {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+    while (next < jobs.length) {
+      const job = jobs[next++];
+      await job();
+    }
+  });
+  await Promise.all(workers);
+}
+
 export function SampleThumb({ s }: { s: Sample }) {
   if (s.modality === "image" && s.fileUrl)
     // eslint-disable-next-line @next/next/no-img-element
@@ -48,79 +129,220 @@ export function SampleThumb({ s }: { s: Sample }) {
   return <p className="line-clamp-5 h-28 overflow-hidden rounded bg-muted p-2 text-xs whitespace-pre-wrap">{c?.prompt ? `${c.prompt}\n` : ""}{text}</p>;
 }
 
+function StageIcon({ stage }: { stage: Stage }) {
+  if (stage === "done") return <CheckCircle2 className="size-4 text-emerald-600" />;
+  if (stage === "failed") return <AlertCircle className="size-4 text-destructive" />;
+  if (stage === "queued") return <Clock className="size-4 text-amber-600" />;
+  return <Loader2 className="size-4 animate-spin text-sky-600" />;
+}
+
+function UploadRow({ r }: { r: Row }) {
+  return (
+    <li className="space-y-1 rounded-md border px-3 py-2">
+      <div className="flex items-center gap-2">
+        <StageIcon stage={r.stage} />
+        <span className="min-w-0 flex-1 truncate text-sm" title={r.name}>
+          {r.name}
+        </span>
+        {r.size !== null && <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{formatBytes(r.size)}</span>}
+        <StatusBadge entry={[stageLabel(r), STAGE_TONE[r.stage]]} />
+      </div>
+      {r.stage === "uploading" && <Progress value={r.progress * 100} className="h-1.5" />}
+      {r.note && <p className={r.stage === "failed" ? "text-xs whitespace-pre-wrap text-destructive" : "text-xs text-muted-foreground"}>{r.note}</p>}
+    </li>
+  );
+}
+
+/** Ô mẫu chưa vào bài được (đang chờ / đang xử lý / lỗi): không có link xem, chỉ báo trạng thái. */
+function PendingTile({ s }: { s: Sample }) {
+  const entry = ingestState(s.ingestState);
+  return (
+    <div className="flex h-28 flex-col items-center justify-center gap-2 rounded bg-muted p-2 text-center">
+      {s.ingestState === "failed" ? <AlertCircle className="size-5 text-destructive" /> : s.ingestState === "queued" ? <Clock className="size-5 text-amber-600" /> : <Loader2 className="size-5 animate-spin text-sky-600" />}
+      <StatusBadge entry={entry} />
+      {s.ingestError && (
+        <p className="line-clamp-2 text-[10px] text-destructive" title={s.ingestError}>
+          {s.ingestError}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function DataTab({ project: p }: { project: Project }) {
   const qc = useQueryClient();
   const [viewer, setViewer] = useState<number | null>(null);
   const draft = p.status === "draft";
-  const datasets = useQuery({
-    queryKey: ["datasets", p.id],
-    queryFn: () => api<Dataset[]>(`/projects/${p.id}/datasets`),
-    refetchInterval: (q) => ((q.state.data ?? []).some((d) => d.status === "pending" || d.status === "ingesting") ? 2000 : false),
+
+  const status = useQuery({
+    queryKey: ["sample-status", p.id],
+    queryFn: () => api<IngestStatus>(`/projects/${p.id}/samples/status`),
+    // Còn file đang chờ / đang xử lý (kể cả nhập từ nguồn ngoài, mở lại trang) thì tự cập nhật.
+    refetchInterval: (q) => {
+      const d = q.state.data;
+      return d && (d.queued + d.processing > 0 || d.preparingVideo > 0) ? 2000 : false;
+    },
   });
   const [page, setPage] = useUrlPage();
   const samples = useQuery({
     queryKey: ["samples", p.id, page],
     queryFn: () => api<Paged<Sample>>(`/projects/${p.id}/samples`, { query: { page, pageSize: 24 } }),
-    refetchInterval: (q) => ((q.state.data?.items ?? []).some((x) => x.mediaState === "preparing") ? 5000 : false),
+    refetchInterval: (q) => ((q.state.data?.items ?? []).some((x) => x.ingestState === "queued" || x.ingestState === "processing" || x.mediaState === "preparing") ? 3000 : false),
   });
-  // Tên lô tự sinh = tên dự án + ngày giờ nạp — doanh nghiệp không phải đặt.
-  const name = autoBatchName(p.name);
+
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [rows, setRows] = useState("");
+  const [rows, setRows] = useState<Row[]>([]);
+  const [textResult, setTextResult] = useState<IngestResult | null>(null);
+  const [text, setText] = useState("");
   const [urls, setUrls] = useState("");
   const [drive, setDrive] = useState("");
   const [s3, setS3] = useState({ endpoint: "", region: "ap-southeast-1", bucket: "", prefix: "", accessKey: "", secretKey: "" });
 
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["datasets", p.id] });
+    void qc.invalidateQueries({ queryKey: ["sample-status", p.id] });
     void qc.invalidateQueries({ queryKey: ["samples", p.id] });
     void qc.invalidateQueries({ queryKey: ["readiness", p.id] });
   };
 
-  async function run(fn: () => Promise<unknown>, ok: string) {
+  const patch = (uid: string, fields: Partial<Row>) => setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...fields } : r)));
+
+  // Theo dõi từng file đã đăng ký: hỏi server tiến trình nạp của đúng các mẫu đó cho tới khi xong.
+  const rowsRef = useRef<Row[]>([]);
+  useEffect(() => {
+    rowsRef.current = rows;
+  });
+  const hasPending = rows.some(isPending);
+  useEffect(() => {
+    if (!hasPending) return;
+    let stopped = false;
+    const poll = async () => {
+      const ids = rowsRef.current.filter(isPending).map((r) => r.sampleId!);
+      if (ids.length === 0) return;
+      try {
+        const found = new Map<string, Sample>();
+        for (let i = 0; i < ids.length; i += 100) {
+          const res = await api<Paged<Sample>>(`/projects/${p.id}/samples`, { query: { ids: ids.slice(i, i + 100).join(",") } });
+          for (const s of res.items) found.set(s.id, s);
+        }
+        if (stopped) return;
+        setRows((prev) =>
+          prev.map((r) => {
+            const s = r.sampleId ? found.get(r.sampleId) : undefined;
+            return s && isPending(r) ? { ...r, ...stageFromSample(s) } : r;
+          }),
+        );
+        void qc.invalidateQueries({ queryKey: ["sample-status", p.id] });
+        void qc.invalidateQueries({ queryKey: ["samples", p.id] });
+        void qc.invalidateQueries({ queryKey: ["readiness", p.id] });
+      } catch {
+        // Mạng chập chờn: lần hỏi sau sẽ thử lại.
+      }
+    };
+    const timer = setInterval(() => void poll(), 1500);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [hasPending, p.id, qc]);
+
+  /** Mẫu server đã nhận → từng dòng chuyển sang theo dõi bằng mã mẫu; dòng bị bỏ qua báo lỗi kèm lý do. */
+  function applyAccepted(sent: Row[], res: IngestResult) {
+    const byIndex = new Map(res.accepted.map((a) => [a.index, a.sampleId]));
+    sent.forEach((row, idx) => {
+      const sampleId = byIndex.get(idx);
+      if (sampleId) patch(row.uid, { stage: "queued", sampleId, progress: 1 });
+      else patch(row.uid, { stage: "failed", note: reasonFor(res.errors, idx) });
+    });
+  }
+
+  async function uploadFiles(files: File[]) {
+    const mine: Row[] = files.map((f) => ({ uid: crypto.randomUUID(), name: f.name, size: f.size, stage: "uploading", progress: 0 }));
+    setRows((prev) => [...mine, ...prev]);
     setBusy(true);
     try {
-      await fn();
-      toast.success(ok);
-      refresh();
-    } catch (e) {
-      toast.error(errorMessage(e));
+      for (let i = 0; i < files.length; i += FILES_PER_BATCH) {
+        const chunk = files.slice(i, i + FILES_PER_BATCH);
+        const chunkRows = mine.slice(i, i + FILES_PER_BATCH);
+        let slots: { name: string; key: string; uploadUrl: string }[];
+        try {
+          slots = await post<{ name: string; key: string; uploadUrl: string }[]>(`/projects/${p.id}/uploads`, { files: chunk.map((f) => ({ name: f.name, sizeBytes: f.size })) });
+        } catch (e) {
+          chunkRows.forEach((r) => patch(r.uid, { stage: "failed", note: errorMessage(e) }));
+          continue;
+        }
+
+        const keys: (string | null)[] = chunk.map(() => null);
+        await runPool(
+          chunk.map((f, k) => async () => {
+            try {
+              await uploadToSignedUrl(slots[k].uploadUrl, f, (fraction) => patch(chunkRows[k].uid, { progress: fraction }));
+              keys[k] = slots[k].key;
+            } catch (e) {
+              patch(chunkRows[k].uid, { stage: "failed", note: errorMessage(e) });
+            }
+          }),
+          PARALLEL_UPLOADS,
+        );
+
+        const sent = chunkRows.filter((_, k) => keys[k] !== null);
+        if (sent.length === 0) continue;
+        sent.forEach((r) => patch(r.uid, { stage: "registering", progress: 1 }));
+        try {
+          const res = await post<IngestResult>(`/projects/${p.id}/samples`, {
+            rows: chunkRows.flatMap((r, k) => (keys[k] !== null ? [{ file: keys[k], name: r.name }] : [])),
+          });
+          applyAccepted(sent, res);
+        } catch (e) {
+          sent.forEach((r) => patch(r.uid, { stage: "failed", note: errorMessage(e) }));
+        }
+      }
     } finally {
       setBusy(false);
-      setProgress(null);
+      refresh();
     }
   }
 
   async function uploadZip(f: File) {
-    const fd = new FormData();
-    fd.append("name", name);
-    fd.append("file", f);
-    await run(() => api(`/projects/${p.id}/datasets`, { method: "POST", body: fd }), "Đã nạp ZIP");
+    const uid = crypto.randomUUID();
+    setRows((prev) => [{ uid, name: f.name, size: f.size, stage: "uploading", progress: 0 }, ...prev]);
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await uploadForm<IngestResult>(`/projects/${p.id}/samples/zip`, fd, {
+        onProgress: (fraction) => patch(uid, { progress: fraction }),
+        // Byte cuối đã rời trình duyệt: server đang giải nén, kiểm tra từng ảnh, bỏ ảnh trùng.
+        onUploaded: () => patch(uid, { stage: "processing", progress: 1, note: "Đang giải nén và kiểm tra từng ảnh…" }),
+      });
+      patch(uid, { stage: "done", note: `${res.ready} ảnh hợp lệ${res.skipped > 0 ? `, bỏ qua ${res.skipped} (sai định dạng hoặc trùng nội dung)` : ""}.` });
+    } catch (e) {
+      patch(uid, { stage: "failed", note: errorMessage(e) });
+    } finally {
+      setBusy(false);
+      refresh();
+    }
   }
 
-  async function uploadFiles(files: File[]) {
-    await run(async () => {
-      const total = files.length;
-      setProgress({ done: 0, total });
-      const keys: { file: string; name: string }[] = [];
-      for (let i = 0; i < files.length; i += 100) {
-        const chunk = files.slice(i, i + 100);
-        const slots = await post<{ name: string; key: string; uploadUrl: string }[]>(`/projects/${p.id}/uploads`, { files: chunk.map((f) => ({ name: f.name, sizeBytes: f.size })) });
-        for (let k = 0; k < chunk.length; k++) {
-          await uploadToSignedUrl(slots[k].uploadUrl, chunk[k]);
-          keys.push({ file: slots[k].key, name: chunk[k].name });
-          setProgress({ done: keys.length, total });
-        }
-      }
-      for (let i = 0; i < keys.length; i += 1000) {
-        await post(`/projects/${p.id}/datasets/manifest`, { name: keys.length > 1000 ? `${name}-${i / 1000 + 1}` : name, rows: keys.slice(i, i + 1000) });
-      }
-    }, "Đã tải lên — đang nạp mẫu");
+  async function importSource(body: unknown) {
+    setBusy(true);
+    try {
+      const res = await post<IngestResult>(`/projects/${p.id}/samples/import`, body);
+      setRows((prev) => [
+        ...res.accepted.map<Row>((a) => ({ uid: crypto.randomUUID(), name: a.name, size: null, stage: "queued", progress: 1, sampleId: a.sampleId, external: true })),
+        ...prev,
+      ]);
+      toast.success(`Đã nhận ${res.queued} file — hệ thống đang tải về và xử lý`);
+      if (res.skipped > 0) toast.warning(`${res.skipped} file bị bỏ qua: ${res.errors.slice(0, 2).join("; ")}`);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+      refresh();
+    }
   }
 
   async function submitRows() {
-    const lines = rows.split("\n").map((l) => l.trim()).filter(Boolean);
+    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     let parsed: unknown[];
     try {
       parsed = lines.map((l) => JSON.parse(l));
@@ -128,19 +350,43 @@ export function DataTab({ project: p }: { project: Project }) {
       toast.error("Mỗi dòng phải là một JSON hợp lệ");
       return;
     }
-    if (parsed.length > 1000) {
-      // Nhiều hơn 1.000 dòng: ghép thành file .jsonl rồi gửi manifestKey (mục 4.6).
-      const blob = new Blob([lines.join("\n")], { type: "application/json" });
-      await run(async () => {
-        const [slot] = await post<{ key: string; uploadUrl: string }[]>(`/projects/${p.id}/uploads`, { files: [{ name: "manifest.jsonl", sizeBytes: blob.size }] });
-        await uploadToSignedUrl(slot.uploadUrl, blob);
-        await post(`/projects/${p.id}/datasets/manifest`, { name, manifestKey: slot.key });
-      }, "Đã gửi manifest");
-    } else await run(() => post(`/projects/${p.id}/datasets/manifest`, { name, rows: parsed }), "Đã gửi dữ liệu");
-    setRows("");
+    setBusy(true);
+    try {
+      const total: IngestResult = { received: 0, ready: 0, queued: 0, skipped: 0, errors: [], accepted: [] };
+      for (let i = 0; i < parsed.length; i += ROWS_PER_REQUEST) {
+        const res = await post<IngestResult>(`/projects/${p.id}/samples`, { rows: parsed.slice(i, i + ROWS_PER_REQUEST) });
+        total.received += res.received;
+        total.ready += res.ready;
+        total.skipped += res.skipped;
+        total.errors.push(...res.errors.map((e) => (i === 0 ? e : `(đợt ${i / ROWS_PER_REQUEST + 1}) ${e}`)));
+      }
+      setTextResult(total);
+      setText("");
+      toast.success(`Đã nạp ${total.ready} mẫu`);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+      refresh();
+    }
+  }
+
+  async function removeFailed() {
+    try {
+      const r = await del<{ deleted: number }>(`/projects/${p.id}/samples/failed`);
+      toast.success(`Đã xoá ${r.deleted} mẫu lỗi`);
+      setRows((prev) => prev.filter((x) => x.stage !== "failed" || !x.sampleId));
+      refresh();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
   }
 
   const isFile = ["image", "audio", "video"].includes(p.modality);
+  const st = status.data;
+  const inProgress = st ? st.queued + st.processing : 0;
+  const total = st ? st.queued + st.processing + st.ready + st.failed : 0;
+  const showProgress = rows.length > 0 || total > 0;
 
   return (
     <div className="space-y-6">
@@ -148,7 +394,7 @@ export function DataTab({ project: p }: { project: Project }) {
         <Card>
           <CardHeader>
             <CardTitle>Nạp dữ liệu</CardTitle>
-            <CardDescription>Mỗi mẫu thành một câu trong bài của labeler khi dự án chạy. Dòng sai bị bỏ qua, không làm hỏng cả lô.</CardDescription>
+            <CardDescription>Mỗi mẫu thành một câu trong bài của labeler khi dự án chạy. File lỗi hay trùng được báo riêng, không làm hỏng các file còn lại.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Tabs defaultValue={isFile ? "files" : "rows"}>
@@ -160,28 +406,39 @@ export function DataTab({ project: p }: { project: Project }) {
               </TabsList>
               {isFile && (
                 <TabsContent value="files" className="space-y-2 pt-3">
-                  <p className="text-sm text-muted-foreground">Mỗi file ≤ 5 GB. Đuôi cho phép: {ACCEPT[p.modality]}</p>
+                  <p className="text-sm text-muted-foreground">Mỗi file ≤ 5 GB. Đuôi cho phép: {ACCEPT[p.modality]}. File được đẩy thẳng lên kho; sau đó hệ thống xử lý từng file (đọc, đo thông tin, loại file hỏng / trùng).</p>
                   <label className={busy ? "pointer-events-none opacity-50" : ""}>
-                    <input type="file" multiple accept={ACCEPT[p.modality]} className="hidden" onChange={(e) => e.target.files && void uploadFiles(Array.from(e.target.files))} />
+                    <input
+                      type="file"
+                      multiple
+                      accept={ACCEPT[p.modality]}
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.target.files ? Array.from(e.target.files) : [];
+                        e.target.value = "";
+                        if (files.length > 0) void uploadFiles(files);
+                      }}
+                    />
                     <span className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-6 text-sm hover:bg-muted">
                       <Upload className="size-4" /> Chọn nhiều file
                     </span>
                   </label>
-                  {progress && (
-                    <div className="max-w-md space-y-1">
-                      <Progress value={(progress.done / progress.total) * 100} />
-                      <p className="text-xs text-muted-foreground">
-                        {progress.done}/{progress.total} file
-                      </p>
-                    </div>
-                  )}
                 </TabsContent>
               )}
               {p.modality === "image" && (
                 <TabsContent value="zip" className="space-y-2 pt-3">
-                  <p className="text-sm text-muted-foreground">Chỉ nhận jpg / png / webp trong ZIP (≤ 200 MB); ảnh trùng nội dung bị bỏ.</p>
+                  <p className="text-sm text-muted-foreground">Chỉ nhận jpg / png / webp trong ZIP (≤ 200 MB); ảnh trùng nội dung bị bỏ. ZIP được giải nén và kiểm tra ngay khi upload xong.</p>
                   <label className={busy ? "pointer-events-none opacity-50" : ""}>
-                    <input type="file" accept=".zip" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadZip(e.target.files[0])} />
+                    <input
+                      type="file"
+                      accept=".zip"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (f) void uploadZip(f);
+                      }}
+                    />
                     <span className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-6 text-sm hover:bg-muted">
                       {busy ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />} Chọn file ZIP
                     </span>
@@ -191,18 +448,34 @@ export function DataTab({ project: p }: { project: Project }) {
               {!isFile && (
                 <TabsContent value="rows" className="space-y-2 pt-3">
                   <p className="text-sm text-muted-foreground">
-                    Mỗi dòng một JSON: <code className="text-xs">{ROW_HINT[p.modality]}</code>. Hơn 1.000 dòng sẽ tự ghép thành file .jsonl.
+                    Mỗi dòng một JSON: <code className="text-xs">{ROW_HINT[p.modality]}</code>. Nhiều hơn 1.000 dòng sẽ tự chia thành nhiều lần gửi. Văn bản được nạp ngay, không phải chờ.
                   </p>
-                  <Textarea rows={8} className="font-mono text-xs" value={rows} onChange={(e) => setRows(e.target.value)} placeholder={ROW_HINT[p.modality]} />
+                  <Textarea rows={8} className="font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)} placeholder={ROW_HINT[p.modality]} />
                   <div className="flex gap-2">
-                    <Button onClick={() => void submitRows()} disabled={busy || !rows.trim()}>
-                      {busy ? <Loader2 className="animate-spin" /> : <FileUp />} Nạp {rows.split("\n").filter((l) => l.trim()).length} dòng
+                    <Button onClick={() => void submitRows()} disabled={busy || !text.trim()}>
+                      {busy ? <Loader2 className="animate-spin" /> : <FileUp />} Nạp {text.split("\n").filter((l) => l.trim()).length} dòng
                     </Button>
                     <label>
-                      <input type="file" accept=".jsonl,.json,.txt" className="hidden" onChange={async (e) => e.target.files?.[0] && setRows(await e.target.files[0].text())} />
+                      <input type="file" accept=".jsonl,.json,.txt" className="hidden" onChange={async (e) => e.target.files?.[0] && setText(await e.target.files[0].text())} />
                       <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-sm hover:bg-muted">Mở file .jsonl</span>
                     </label>
                   </div>
+                  {textResult && (
+                    <Alert variant={textResult.skipped > 0 ? "destructive" : "default"}>
+                      <AlertTitle>
+                        Đã nạp {textResult.ready} mẫu{textResult.skipped > 0 ? `, bỏ qua ${textResult.skipped} dòng` : ""}
+                      </AlertTitle>
+                      {textResult.errors.length > 0 && (
+                        <AlertDescription>
+                          <ul className="list-disc pl-4">
+                            {textResult.errors.map((e, i) => (
+                              <li key={i}>{e}</li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      )}
+                    </Alert>
+                  )}
                 </TabsContent>
               )}
               {isFile && (
@@ -215,7 +488,7 @@ export function DataTab({ project: p }: { project: Project }) {
                     </TabsList>
                     <TabsContent value="urls" className="space-y-2 pt-3">
                       <Textarea rows={5} value={urls} onChange={(e) => setUrls(e.target.value)} placeholder="https://.../a.jpg (mỗi dòng một URL công khai)" />
-                      <Button disabled={busy || !urls.trim()} onClick={() => void run(() => post(`/projects/${p.id}/datasets/import`, { name, source: "urls", urls: urls.split("\n").map((u) => u.trim()).filter(Boolean) }), "Đã gửi lệnh nhập")}>
+                      <Button disabled={busy || !urls.trim()} onClick={() => void importSource({ source: "urls", urls: urls.split("\n").map((u) => u.trim()).filter(Boolean) })}>
                         <CloudDownload /> Nhập
                       </Button>
                     </TabsContent>
@@ -227,14 +500,14 @@ export function DataTab({ project: p }: { project: Project }) {
                           </Field>
                         ))}
                       </div>
-                      <p className="text-xs text-muted-foreground">Khoá bí mật chỉ lưu dạng mã hoá tới khi nhập xong rồi xoá.</p>
-                      <Button disabled={busy || !s3.bucket} onClick={() => void run(() => post(`/projects/${p.id}/datasets/import`, { name, source: "s3", s3: { ...s3, endpoint: s3.endpoint || null } }), "Đã gửi lệnh nhập")}>
+                      <p className="text-xs text-muted-foreground">Khoá bí mật chỉ dùng một lần để liệt kê file và ký link tải — không được lưu lại.</p>
+                      <Button disabled={busy || !s3.bucket} onClick={() => void importSource({ source: "s3", s3: { ...s3, endpoint: s3.endpoint || null } })}>
                         <CloudDownload /> Nhập từ S3
                       </Button>
                     </TabsContent>
                     <TabsContent value="drive" className="space-y-2 pt-3">
                       <Textarea rows={4} value={drive} onChange={(e) => setDrive(e.target.value)} placeholder="https://drive.google.com/file/d/... (mỗi dòng một link chia sẻ công khai)" />
-                      <Button disabled={busy || !drive.trim()} onClick={() => void run(() => post(`/projects/${p.id}/datasets/import`, { name, source: "googleDrive", googleDrive: { links: drive.split("\n").map((u) => u.trim()).filter(Boolean) } }), "Đã gửi lệnh nhập")}>
+                      <Button disabled={busy || !drive.trim()} onClick={() => void importSource({ source: "gdrive", googleDrive: { links: drive.split("\n").map((u) => u.trim()).filter(Boolean) } })}>
                         <CloudDownload /> Nhập từ Drive
                       </Button>
                     </TabsContent>
@@ -248,49 +521,51 @@ export function DataTab({ project: p }: { project: Project }) {
         <p className="text-sm text-muted-foreground">Dự án đã publish — không nạp thêm dữ liệu được.</p>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Các lô dữ liệu</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <QueryState query={datasets} empty={(d) => d.length === 0}>
-            {(d) => (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tên</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Mẫu</TableHead>
-                    <TableHead className="text-right">Bỏ qua</TableHead>
-                    <TableHead>Tạo lúc</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {d.map((ds) => (
-                    <TableRow key={ds.id}>
-                      <TableCell>
-                        <div className="font-medium">{ds.name}</div>
-                        {ds.errorSummary && <div className="max-w-md text-xs whitespace-pre-wrap text-destructive">{ds.errorSummary}</div>}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge entry={datasetStatus(ds.status)} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{ds.sampleCount}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ds.skippedCount}</TableCell>
-                      <TableCell>{formatDateTime(ds.createdAt)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      {showProgress && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tiến trình xử lý</CardTitle>
+            <CardDescription>
+              Mỗi file đi qua: đang upload → đã upload, chờ xử lý → đang xử lý file → đã xử lý. Chỉ file đã xử lý mới thành câu hỏi trong bài.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {total > 0 && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <StatusBadge entry={["Chờ xử lý " + (st?.queued ?? 0), "warning"]} />
+                  <StatusBadge entry={["Đang xử lý " + (st?.processing ?? 0), "info"]} />
+                  <StatusBadge entry={["Đã xử lý " + (st?.ready ?? 0), "success"]} />
+                  {(st?.failed ?? 0) > 0 && <StatusBadge entry={["Lỗi " + st!.failed, "danger"]} />}
+                  {(st?.preparingVideo ?? 0) > 0 && <StatusBadge entry={["Video đang chuẩn bị " + st!.preparingVideo, "info"]} />}
+                  {draft && (st?.failed ?? 0) > 0 && (
+                    <Button variant="ghost" size="sm" className="ml-auto" onClick={() => void removeFailed()}>
+                      <Trash2 /> Xoá mẫu lỗi
+                    </Button>
+                  )}
+                </div>
+                <Progress value={total === 0 ? 0 : (((st?.ready ?? 0) + (st?.failed ?? 0)) / total) * 100} />
+                <p className="text-xs text-muted-foreground">
+                  {inProgress > 0 ? `Còn ${inProgress} file đang xử lý — có thể rời trang, hệ thống vẫn tiếp tục.` : "Đã xử lý xong tất cả file."}
+                </p>
+              </div>
             )}
-          </QueryState>
-        </CardContent>
-      </Card>
+            {rows.length > 0 && (
+              <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {rows.slice(0, 300).map((r) => (
+                  <UploadRow key={r.uid} r={r} />
+                ))}
+                {rows.length > 300 && <li className="text-center text-xs text-muted-foreground">…và {rows.length - 300} file nữa (xem ở danh sách mẫu bên dưới).</li>}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle>Mẫu ({samples.data?.total ?? 0})</CardTitle>
-          <CardDescription>Bản gốc, không có watermark.</CardDescription>
+          <CardDescription>Bản gốc, không có watermark. Mẫu chưa xử lý xong hoặc lỗi hiện kèm trạng thái.</CardDescription>
         </CardHeader>
         <CardContent>
           <QueryState query={samples} empty={(d) => d.items.length === 0}>
@@ -299,7 +574,9 @@ export function DataTab({ project: p }: { project: Project }) {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                   {d.items.map((s) => (
                     <div key={s.id} className="space-y-1 rounded-md border p-1.5">
-                      {s.modality === "image" && s.fileUrl ? (
+                      {s.ingestState !== "ready" ? (
+                        <PendingTile s={s} />
+                      ) : s.modality === "image" && s.fileUrl ? (
                         <ImageThumb
                           src={s.fileUrl}
                           name={s.originalName}
@@ -315,8 +592,8 @@ export function DataTab({ project: p }: { project: Project }) {
                       <p className="text-[10px] text-muted-foreground">
                         {s.metadata.width ? `${s.metadata.width}×${s.metadata.height}` : s.metadata.durationSec ? `${s.metadata.durationSec}s` : ""} {formatBytes(s.sizeBytes)}
                       </p>
-                      {s.mediaState === "preparing" && <p className="text-[10px] text-amber-600">Đang chuẩn bị video…</p>}
-                      {s.mediaState === "failed" && (
+                      {s.ingestState === "ready" && s.mediaState === "preparing" && <p className="text-[10px] text-amber-600">Đang chuẩn bị video…</p>}
+                      {s.ingestState === "ready" && s.mediaState === "failed" && (
                         <p className="text-[10px] text-destructive" title={s.mediaError ?? undefined}>
                           Video hỏng, không xử lý được
                         </p>

@@ -45,7 +45,7 @@ function AttemptReview({ a }: { a: AttemptSummary }) {
         const f = final.get(l.sampleId);
         const khop = f?.consensusFinal ? JSON.stringify(sapXep(l.payload.data)) === JSON.stringify(sapXep(f.consensusFinal)) : null;
         return (
-          <div key={l.id} className="rounded-lg border p-3">
+          <div key={l.sampleId} className="rounded-lg border p-3">
             <p className="mb-2 flex items-center gap-2 text-sm font-medium">
               Câu đã trả lời #{i + 1}
               {khop !== null && <ToneBadge tone={khop ? "success" : "danger"}>{khop ? "Giống đa số" : "Khác đa số"}</ToneBadge>}

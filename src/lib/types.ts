@@ -203,26 +203,41 @@ export type Readiness = {
   limits: ProjectLimits;
 };
 
-export type Dataset = {
-  id: string;
-  name: string;
-  status: "pending" | "ingesting" | "ready" | "failed";
-  sampleCount: number;
-  skippedCount: number;
-  errorSummary: string | null;
-  createdAt: string;
-  finishedAt: string | null;
+/** Tiến trình nạp của MỘT mẫu: xếp hàng → đang xử lý (tải / đọc file) → sẵn sàng | lỗi. Chỉ mẫu "ready" vào bài làm. */
+export type IngestState = "queued" | "processing" | "ready" | "failed";
+
+/** GET /projects/{id}/samples/status — đếm mẫu theo tiến trình nạp. */
+export type IngestStatus = {
+  queued: number;
+  processing: number;
+  ready: number;
+  failed: number;
+  /** Số file video đã nạp xong nhưng media-svc còn chuẩn bị bản chuẩn (chưa publish được). */
+  preparingVideo: number;
+};
+
+/** Kết quả một lần gửi dữ liệu (dòng JSON / nhập nguồn ngoài / ZIP). */
+export type IngestResult = {
+  received: number;
+  ready: number;
+  queued: number;
+  skipped: number;
+  errors: string[];
+  /** Mẫu đã tạo (không có với ZIP): vị trí dòng / file trong request + mã mẫu để theo dõi từng file. */
+  accepted: { index: number; sampleId: string; name: string }[];
 };
 
 export type Sample = {
   id: string;
-  datasetId: string;
   modality: Modality;
   originalName: string;
   sizeBytes: number | null;
   fileUrl: string | null;
   content: SampleContent | null;
   metadata: SampleMeta;
+  ingestState: IngestState;
+  /** Lý do khi ingestState = failed. */
+  ingestError?: string | null;
   /** Video: chuẩn bị bản chuẩn để gắn watermark. null = không cần. */
   mediaState?: "preparing" | "ready" | "failed" | null;
   mediaError?: string | null;
@@ -325,7 +340,6 @@ export type Attempt = {
   questions: AttemptQuestion[];
 };
 
-export type SaveAnswerResponse = { attemptId: string; sampleId: string; answered: boolean; answeredCount: number; savedAt: string | null };
 export type InvalidAnswer = { index: number; sampleId: string; code: string; message: string };
 export type SubmitAttemptResponse = { attemptId: string; submittedAt: string; questionCount: number; answeredCount: number; collectionFinished: boolean };
 
@@ -388,10 +402,9 @@ export type Slots = {
 
 export type AnnotationStatus = "submitted" | "accepted" | "excluded";
 
+/** Một nhãn — khoá (projectId, attemptId, sampleId); trạng thái / thời điểm suy ra từ bài làm. */
 export type Annotation = {
-  id: string;
   projectId: string;
-  taskId: string | null;
   sampleId: string;
   source: "professional" | "linkGateway";
   fileUrl: string | null;
@@ -400,7 +413,8 @@ export type Annotation = {
   labelerId: string | null;
   payload: LabelPayload;
   status: AnnotationStatus;
-  submittedAt: string;
+  /** null với nhãn cổng link (không thuộc bài làm nào). */
+  submittedAt: string | null;
   attemptId: string;
   decidedAt: string | null;
 };
@@ -430,7 +444,6 @@ export type Progress = {
 
 export type TaskReport = {
   id: string;
-  taskId: string;
   sampleId: string;
   labelerId: string;
   reason: "broken" | "inappropriate" | "unclear" | "other";
@@ -438,7 +451,7 @@ export type TaskReport = {
   state: "open" | "dismissed" | "excluded";
   createdAt: string;
   resolvedAt: string | null;
-  reportsOnTask: number;
+  reportsOnSample: number;
 };
 
 /* ---------- Tiền ---------- */
