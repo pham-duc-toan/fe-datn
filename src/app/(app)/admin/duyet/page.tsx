@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, RefreshCw, X } from "lucide-react";
+import { Check, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,16 +21,17 @@ import { APPROVAL_KIND, genericStatus } from "@/lib/labels";
 import type { Paged } from "@/lib/types";
 import { useUrlPage, useUrlState } from "@/lib/use-url-state";
 
-type Item = { id: string; kind: string; subjectId: string; status: string; title: string | null; requesterId: string | null; amountVnd: number | null; note: string | null; openedAt: string; decidedAt: string | null };
+type Item = { id: string; kind: string; subjectId: string; status: string; title: string | null; requesterId: string | null; amountVnd: number | null; note: string | null; projectId: string | null; detail: string | null; openedAt: string; decidedAt: string | null };
 
-const DETAIL: Record<string, (s: string) => string> = {
+const DETAIL: Record<string, (it: Item) => string | null> = {
   kyb: () => "/admin/kyb",
   identity: () => "/admin/xac-minh",
-  project: (s) => `/du-an/${s}`,
+  project: (it) => `/admin/du-an/${it.subjectId}`,
   withdrawal: () => "/admin/rut-tien",
   appeal: () => "/admin/khieu-nai",
   link: () => "/admin/link",
   referral: () => "/admin/link?tab=gioi-thieu",
+  manual: (it) => (it.projectId ? `/admin/du-an/${it.projectId}` : null),
 };
 
 const reason: ActionField[] = [{ name: "reason", label: "Lý do", type: "textarea", required: true }];
@@ -81,6 +82,20 @@ function Actions({ it, done }: { it: Item; done: () => void }) {
       );
     case "referral":
       return <>{approveBtn(() => post(`/links/admin/referrals/${s}/approve`))}{rejectBtn((r) => post(`/links/admin/referrals/${s}/reject`, { reason: r }))}</>;
+    case "manual":
+      return (
+        <ActionDialog
+          trigger={<Button size="xs"><Check /> Đã xử lý</Button>}
+          title="Đánh dấu đã xử lý"
+          description="Hệ thống không tự làm việc này. Hãy xử lý xong (chuyển tiền tay, đối soát...) rồi ghi lại đã làm gì."
+          fields={[{ name: "note", label: "Đã làm gì", type: "textarea", required: true, placeholder: "vd: Đã chuyển tay 50.000 đ cho người làm" }]}
+          onConfirm={async (v) => {
+            await post(`/admin/approvals/manual/${s}/resolve`, { note: String(v.note ?? "") });
+            done();
+          }}
+          successMessage="Đã ghi nhận"
+        />
+      );
     default:
       return null;
   }
@@ -130,12 +145,6 @@ export default function ApprovalsPage() {
                 ))}
               </SelectContent>
             </Select>
-            <ActionDialog
-              trigger={<Button variant="outline"><RefreshCw /> Dựng lại</Button>}
-              title="Dựng lại hàng đợi từ nhật ký audit?"
-              onConfirm={() => post("/admin/approvals/rebuild")}
-              successMessage="Đã dựng lại"
-            />
           </>
         }
       />
@@ -157,13 +166,23 @@ export default function ApprovalsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {d.items.map((it) => (
+                    {d.items.map((it) => {
+                      const href = DETAIL[it.kind]?.(it) ?? null;
+                      return (
                       <TableRow key={it.id}>
                         <TableCell className="pl-4 font-medium">{APPROVAL_KIND[it.kind] ?? it.kind}</TableCell>
-                        <TableCell className="max-w-xs">
-                          <div className="truncate">{it.title ?? "—"}</div>
-                          {it.note && <div className="truncate text-xs text-muted-foreground">{it.note}</div>}
-                        </TableCell>
+                        {it.kind === "manual" ? (
+                          <TableCell className="max-w-md whitespace-normal">
+                            <div className="font-medium">{it.title ?? "—"}</div>
+                            {it.detail && <div className="text-xs text-muted-foreground">{it.detail}</div>}
+                            {it.note && it.status !== "pending" && <div className="mt-1 text-xs">Đã xử lý: {it.note}</div>}
+                          </TableCell>
+                        ) : (
+                          <TableCell className="max-w-xs">
+                            <div className="truncate">{it.title ?? "—"}</div>
+                            {it.note && <div className="truncate text-xs text-muted-foreground">{it.note}</div>}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <UserName id={it.requesterId} />
                         </TableCell>
@@ -175,15 +194,18 @@ export default function ApprovalsPage() {
                         <TableCell>
                           <div className="flex justify-end gap-1">
                             {it.status === "pending" && <Actions it={it} done={done} />}
-                            <Button size="icon-xs" variant="ghost" asChild>
-                              <Link href={DETAIL[it.kind]?.(it.subjectId) ?? "/admin"} aria-label="Chi tiết">
-                                <ExternalLink />
-                              </Link>
-                            </Button>
+                            {href && (
+                              <Button size="icon-xs" variant="ghost" asChild>
+                                <Link href={href} aria-label="Chi tiết">
+                                  <ExternalLink />
+                                </Link>
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 <div className="px-4 pb-3">

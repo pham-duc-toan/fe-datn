@@ -1,7 +1,7 @@
 import {
   BadgeCheck, BarChart3, Bell, Briefcase, Building2, ClipboardCheck, Coins, FileText, Gavel, Home, KeyRound, Landmark,
   LayoutTemplate, Link2, ListChecks, Megaphone, PlusCircle, ScrollText, Search, Settings, ShieldAlert, ShieldCheck, Store, Tags, Ticket,
-  Trophy, UserCog, Users, Wallet, Wrench, Fingerprint, Receipt, Share2, type LucideIcon,
+  Trophy, UserCog, Users, Wallet, Fingerprint, Receipt, Share2, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "./types";
 
@@ -43,13 +43,12 @@ export const NAV: Record<Role, NavItem[]> = {
     { href: "/admin/nguoi-dung", label: "Người dùng", icon: UserCog },
     { href: "/admin/link", label: "Kiểm duyệt link", icon: Link2 },
     { href: "/admin/cai-dat", label: "Cài đặt hệ thống", icon: Settings },
-    { href: "/admin/nhat-ky", label: "Nhật ký audit", icon: ScrollText },
+    { href: "/admin/nhat-ky", label: "Nhật ký hoạt động", icon: ScrollText },
     { href: "/admin/thong-bao", label: "Thông báo hệ thống", icon: Megaphone },
     { href: "/admin/mau", label: "Mẫu bài toán", icon: LayoutTemplate },
     { href: "/admin/the", label: "Thẻ lĩnh vực & ngôn ngữ", icon: Tags },
     { href: "/admin/watermark", label: "Truy watermark", icon: Search },
     { href: "/admin/hoa-don", label: "Hoá đơn", icon: FileText },
-    { href: "/admin/van-hanh", label: "Vận hành", icon: Wrench },
   ],
 };
 

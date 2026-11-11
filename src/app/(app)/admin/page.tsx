@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertOctagon, CheckCircle2, ClipboardCheck } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertOctagon, AlertTriangle, CheckCircle2, ClipboardCheck } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/common/page-header";
@@ -32,15 +32,51 @@ type Overview = {
   daily: { date: string; newUsers: number; attemptsSubmitted: number; projectsGraded: number; depositsVnd: number }[];
 };
 
+type SystemHealth = { status: "ok" | "co_loi" | "khong_ro"; failedCount: number; affectedAreas: number; checkedAt: string | null; techTeamNotified: boolean };
+
+/**
+ * Tình trạng hệ thống: chỉ đếm lỗi KỸ THUẬT (hệ thống không tự xử lý được) — admin không cần làm gì ngoài báo đội
+ * kỹ thuật. Việc nghiệp vụ cần admin xử lý tay nằm ở Hàng đợi duyệt.
+ */
+function HealthCard({ h }: { h: SystemHealth | undefined }) {
+  if (!h) return null;
+  const luc = h.checkedAt ? `Kiểm tra lúc ${formatDateTime(h.checkedAt)}.` : "";
+  return (
+    <Card className={h.status === "co_loi" ? "border-amber-300 dark:border-amber-700" : undefined}>
+      <CardHeader>
+        <CardTitle>Tình trạng hệ thống</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1.5 text-sm">
+        {h.status === "ok" && (
+          <p className="flex items-center gap-1.5 text-emerald-600">
+            <CheckCircle2 className="size-4" /> Mọi thứ hoạt động bình thường
+          </p>
+        )}
+        {h.status === "co_loi" && (
+          <>
+            <p className="flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="size-4" /> Có {formatNumber(h.failedCount)} việc hệ thống không tự xử lý được
+            </p>
+            <p className="text-muted-foreground">
+              {h.techTeamNotified ? "Đội kỹ thuật đã được báo qua email." : "Hãy báo đội kỹ thuật để kiểm tra."} Bạn không cần thao tác gì ở đây; việc cần bạn xử lý nằm ở Hàng đợi duyệt.
+            </p>
+          </>
+        )}
+        {h.status === "khong_ro" && <p className="text-muted-foreground">Chưa kiểm tra được tình trạng hệ thống — thử lại sau ít phút.</p>}
+        {luc && <p className="text-xs text-muted-foreground">{luc}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminHome() {
   const [from, setFrom] = useState(daysAgo(29));
   const [to, setTo] = useState(isoDay(new Date()));
   const ov = useQuery({ queryKey: ["admin-overview", from, to], queryFn: () => api<Overview>("/admin/stats/overview", { query: { from, to } }) });
   const rec = useQuery({ queryKey: ["reconciliation"], queryFn: () => api<{ healthy: boolean; entryCount: number; unbalancedEntries: string[]; balanceMismatches: string[]; negativeAccounts: string[]; brokenChain: number[] }>("/ledger/admin/reconciliation") });
   const sum = useQuery({ queryKey: ["approvals-summary"], queryFn: () => api<{ totalPending: number; kinds: { kind: string; pending: number; oldestWaitingHours: number | null }[] }>("/admin/approvals/summary"), refetchInterval: 30000 });
-  const ops = useQuery({ queryKey: ["ops-queues"], queryFn: () => api<{ reachable: boolean; threshold: number; deadLetterQueues: { queue: string; messages: number; overThreshold: boolean }[] }>("/admin/ops/queues") });
+  const health = useQuery({ queryKey: ["system-health"], queryFn: () => api<SystemHealth>("/admin/system-health"), refetchInterval: 60000 });
   const o = ov.data;
-  const dlqBad = (ops.data?.deadLetterQueues ?? []).filter((q) => q.messages > 0);
 
   return (
     <>
@@ -102,6 +138,7 @@ export default function AdminHome() {
           </CardContent>
         </Card>
         <div className="space-y-6">
+          <HealthCard h={health.data} />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -121,26 +158,6 @@ export default function AdminHome() {
               <Link href="/admin/duyet" className="mt-2 inline-flex items-center gap-1 text-primary hover:underline">
                 <ClipboardCheck className="size-4" /> Mở hàng đợi
               </Link>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Hàng đợi lỗi (DLQ)</CardTitle>
-              <CardDescription>{ops.data?.reachable === false ? "Không đọc được trạng thái hàng đợi" : `Ngưỡng cảnh báo ${ops.data?.threshold ?? "—"}`}</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm">
-              {dlqBad.length === 0 ? (
-                <p className="flex items-center gap-1.5 text-emerald-600">
-                  <CheckCircle2 className="size-4" /> Không có tin lỗi
-                </p>
-              ) : (
-                dlqBad.map((q) => (
-                  <div key={q.queue} className="flex justify-between">
-                    <span className="truncate">{q.queue}</span>
-                    <span className={q.overThreshold ? "font-semibold text-destructive" : ""}>{q.messages}</span>
-                  </div>
-                ))
-              )}
             </CardContent>
           </Card>
         </div>

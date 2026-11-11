@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, History, RotateCcw, Save, Search, Zap } from "lucide-react";
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, History, RotateCcw, Save, Search, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import { ToneBadge } from "@/components/common/status-badge";
 import { UserName } from "@/components/common/user-name";
 import { api, put } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import { formatDateTime, formatDuration } from "@/lib/format";
+import { formatBytes, formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import { TOOL_LABEL } from "@/lib/labels";
 import type { ToolKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -27,11 +27,16 @@ import { cn } from "@/lib/utils";
 type Setting = { key: string; name: string; group: string; type: string; unit: string; min: number | null; max: number | null; effect: string; description: string; choices: string[] | null; multiple?: boolean; defaultValue: unknown; value: unknown; version: number; updatedAt: string | null; updatedBy: string | null };
 
 const PROVIDER_LABEL: Record<string, string> = { sandbox: "Cổng giả lập (sandbox)", vnpay: "VNPay", momo: "MoMo" };
+const GATE_PAYOUT_LABEL: Record<string, string> = { perClick: "Trả ngay từng lượt", batched: "Gom lại trả theo đợt" };
+
+/** Nhóm setting điều chỉnh cách hệ thống chạy bên trong — gom vào mục "Nâng cao", mặc định gập. */
+const TECH_GROUP = "Kỹ thuật";
 
 /** Nhãn hiển thị của một lựa chọn: tên công cụ / cổng nạp; mã event giữ nguyên. */
 function choiceLabel(key: string, c: string): string {
   if (key === "gate.allowed_tools") return TOOL_LABEL[c as ToolKind] ?? c;
   if (key === "payment.enabled_providers") return PROVIDER_LABEL[c] ?? c;
+  if (key === "ledger.gate_payout_mode") return GATE_PAYOUT_LABEL[c] ?? c;
   return c;
 }
 
@@ -70,12 +75,23 @@ const HIGHLIGHT = new Set(["project.auto_approve", "annotation.auto_approve_agre
 function show(v: unknown, s: Setting): string {
   if (v === null || v === undefined) return "—";
   if (s.type === "durationSeconds" && typeof v === "number") return formatDuration(v);
+  if (s.unit === "byte" && typeof v === "number") return formatBytes(v);
   if (typeof v === "boolean") return v ? "Bật" : "Tắt";
+  if (s.choices && !s.multiple && typeof v === "string") return choiceLabel(s.key, v);
+  if (typeof v === "number") return formatNumber(v, Number.isInteger(v) ? 0 : 2);
   if (s.multiple && typeof v === "string") return splitList(v).map((c) => choiceLabel(s.key, c)).join(", ") || "(trống)";
   return typeof v === "string" ? v : JSON.stringify(v);
 }
 
-function HistoryButton({ k }: { k: string }) {
+/** Cận dưới / trên theo đơn vị dễ đọc (thời gian, dung lượng). */
+function limit(n: number, s: Setting): string {
+  if (s.type === "durationSeconds") return formatDuration(n);
+  if (s.unit === "byte") return formatBytes(n);
+  return formatNumber(n, Number.isInteger(n) ? 0 : 2);
+}
+
+function HistoryButton({ s }: { s: Setting }) {
+  const k = s.key;
   const [open, setOpen] = useState(false);
   const q = useQuery({ queryKey: ["setting-history", k], queryFn: () => api<{ version: number; oldValue: unknown; newValue: unknown; changedBy: string | null; changedAt: string; reason: string | null }[]>(`/admin/settings/${k}/history`), enabled: open });
   return (
@@ -87,7 +103,7 @@ function HistoryButton({ k }: { k: string }) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-mono text-sm">{k}</DialogTitle>
+          <DialogTitle>Lịch sử thay đổi: {s.name || k}</DialogTitle>
         </DialogHeader>
         {q.isPending ? (
           <Loading />
@@ -99,7 +115,7 @@ function HistoryButton({ k }: { k: string }) {
               <li key={h.version} className="border-b pb-2">
                 <div className="flex justify-between">
                   <span>
-                    v{h.version}: <code>{JSON.stringify(h.oldValue)}</code> → <code>{JSON.stringify(h.newValue)}</code>
+                    <span className="text-muted-foreground">Lần {h.version}:</span> {show(h.oldValue, s)} → <span className="font-medium">{show(h.newValue, s)}</span>
                   </span>
                   <span className="text-xs text-muted-foreground">{formatDateTime(h.changedAt)}</span>
                 </div>
@@ -115,7 +131,7 @@ function HistoryButton({ k }: { k: string }) {
   );
 }
 
-function Row({ s }: { s: Setting }) {
+function Row({ s, technical }: { s: Setting; technical: boolean }) {
   const qc = useQueryClient();
   const isDur = s.type === "durationSeconds";
   const [unit, setUnit] = useState(() => {
@@ -162,20 +178,21 @@ function Row({ s }: { s: Setting }) {
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold">{s.name || s.key}</span>
-          <code className="text-xs text-muted-foreground">{s.key}</code>
+          {technical && <code className="text-xs text-muted-foreground">{s.key}</code>}
           {HIGHLIGHT.has(s.key) && (
             <ToneBadge tone="warning">
               <Zap className="size-3" /> tự duyệt / phí
             </ToneBadge>
           )}
-          {s.effect === "restart" && <ToneBadge tone="muted">cần khởi động lại service</ToneBadge>}
+          {s.effect === "restart" && <ToneBadge tone="muted">có hiệu lực sau khi khởi động lại hệ thống</ToneBadge>}
         </div>
         <p className="text-sm text-muted-foreground">{s.description}</p>
         <p className="text-xs text-muted-foreground">
           Mặc định {show(s.defaultValue, s)}
-          {s.min !== null && ` · tối thiểu ${s.min}`}
-          {s.max !== null && ` · tối đa ${s.max}`} {s.unit && `· ${s.unit}`} · v{s.version}
-          {s.updatedAt && ` · sửa ${formatDateTime(s.updatedAt)}`}
+          {s.min !== null && ` · tối thiểu ${limit(s.min, s)}`}
+          {s.max !== null && ` · tối đa ${limit(s.max, s)}`}
+          {s.unit && !["byte", "giây", "ký tự"].includes(s.unit) && ` · đơn vị: ${s.unit}`}
+          {s.updatedAt && ` · sửa lần cuối ${formatDateTime(s.updatedAt)}`}
         </p>
       </div>
       <div className="flex items-start gap-1.5">
@@ -192,7 +209,7 @@ function Row({ s }: { s: Setting }) {
               <SelectContent>
                 {s.choices.map((c) => (
                   <SelectItem key={c} value={c}>
-                    {c}
+                    {choiceLabel(s.key, c)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -217,6 +234,7 @@ function Row({ s }: { s: Setting }) {
           ) : (
             <Input type={["int", "long", "double"].includes(s.type) ? "number" : "text"} value={draft} onChange={(e) => setDraft(e.target.value)} />
           )}
+          {s.unit === "byte" && draft !== "" && Number.isFinite(Number(draft)) && <p className="text-xs text-muted-foreground">= {formatBytes(Number(draft))} (nhập theo byte)</p>}
           <Input className="h-7 text-xs" placeholder="Lý do thay đổi (ghi vào lịch sử)" value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
         <Button size="icon-sm" onClick={() => void save(parsed())} disabled={busy} aria-label="Lưu">
@@ -225,17 +243,44 @@ function Row({ s }: { s: Setting }) {
         <Button size="icon-sm" variant="outline" onClick={() => void save(s.defaultValue)} disabled={busy} aria-label="Về mặc định" title="Về mặc định">
           <RotateCcw />
         </Button>
-        <HistoryButton k={s.key} />
+        <HistoryButton s={s} />
       </div>
     </div>
+  );
+}
+
+function Group({ title, hint, list, technical = false, open, onOpenChange }: { title: string; hint?: string; list: Setting[]; technical?: boolean; open: boolean; onOpenChange: (v: boolean) => void }) {
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange} asChild>
+      <Card className={cn("gap-0 py-0", technical && "border-dashed")}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer py-4 select-none">
+            <CardTitle className="flex items-center gap-2">
+              <ChevronDown className={cn("size-4 transition-transform", !open && "-rotate-90")} />
+              {technical && <Wrench className="size-4 text-muted-foreground" />}
+              {title}
+              <span className="text-sm font-normal text-muted-foreground">{list.length} mục</span>
+            </CardTitle>
+            {hint && <p className="pl-6 text-sm text-muted-foreground">{hint}</p>}
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="border-t pb-2">
+            {list.map((s) => (
+              <Row key={`${s.key}-${s.version}`} s={s} technical={technical} />
+            ))}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
 export default function SettingsPage() {
   const q = useQuery({ queryKey: ["settings"], queryFn: () => api<Setting[]>("/admin/settings") });
   const [search, setSearch] = useState("");
-  // Nhóm đang thu gọn; mặc định mở hết. Đang tìm kiếm thì luôn mở để thấy kết quả.
-  const [closed, setClosed] = useState<Set<string>>(new Set());
+  // Nhóm đang thu gọn; mặc định mở hết trừ mục "Nâng cao". Đang tìm kiếm thì luôn mở để thấy kết quả.
+  const [closed, setClosed] = useState<Set<string>>(new Set([TECH_GROUP]));
   const groups = useMemo(() => {
     const m = new Map<string, Setting[]>();
     for (const s of q.data ?? []) {
@@ -244,6 +289,8 @@ export default function SettingsPage() {
     }
     return Array.from(m.entries());
   }, [q.data, search]);
+  const business = groups.filter(([g]) => g !== TECH_GROUP);
+  const technical = groups.find(([g]) => g === TECH_GROUP);
   const setOpen = (g: string, open: boolean) =>
     setClosed((old) => {
       const next = new Set(old);
@@ -259,7 +306,7 @@ export default function SettingsPage() {
         description="Mọi con số nghiệp vụ sửa được lúc đang chạy; có hiệu lực cho thao tác mới."
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={() => setClosed(new Set())}>
+            <Button variant="outline" size="sm" onClick={() => setClosed(new Set([TECH_GROUP]))}>
               <ChevronsUpDown /> Mở hết
             </Button>
             <Button variant="outline" size="sm" onClick={() => setClosed(new Set(groups.map(([g]) => g)))}>
@@ -267,7 +314,7 @@ export default function SettingsPage() {
             </Button>
             <div className="relative">
               <Search className="absolute top-2 left-2 size-4 text-muted-foreground" />
-              <Input className="w-72 pl-8" placeholder="Tìm theo khoá / mô tả" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input className="w-72 pl-8" placeholder="Tìm theo tên hoặc mô tả" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </>
         }
@@ -275,31 +322,19 @@ export default function SettingsPage() {
       <QueryState query={q}>
         {() => (
           <div className="space-y-4">
-            {groups.map(([g, list]) => {
-              const open = Boolean(search) || !closed.has(g);
-              return (
-                <Collapsible key={g} open={open} onOpenChange={(v) => setOpen(g, v)} asChild>
-                  <Card className="gap-0 py-0">
-                    <CollapsibleTrigger asChild>
-                      <CardHeader className="cursor-pointer py-4 select-none">
-                        <CardTitle className="flex items-center gap-2">
-                          <ChevronDown className={cn("size-4 transition-transform", !open && "-rotate-90")} />
-                          {g}
-                          <span className="text-sm font-normal text-muted-foreground">{list.length} mục</span>
-                        </CardTitle>
-                      </CardHeader>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <CardContent className="border-t pb-2">
-                        {list.map((s) => (
-                          <Row key={`${s.key}-${s.version}`} s={s} />
-                        ))}
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              );
-            })}
+            {business.map(([g, list]) => (
+              <Group key={g} title={g} list={list} open={Boolean(search) || !closed.has(g)} onOpenChange={(v) => setOpen(g, v)} />
+            ))}
+            {technical && (
+              <Group
+                title="Nâng cao — dành cho đội kỹ thuật"
+                hint="Các mục này điều chỉnh cách hệ thống chạy bên trong (chu kỳ xử lý nền, giới hạn kỹ thuật). Chỉ đổi khi đội kỹ thuật yêu cầu — đặt sai có thể làm hệ thống chậm hoặc gián đoạn."
+                list={technical[1]}
+                technical
+                open={Boolean(search) || !closed.has(TECH_GROUP)}
+                onOpenChange={(v) => setOpen(TECH_GROUP, v)}
+              />
+            )}
           </div>
         )}
       </QueryState>

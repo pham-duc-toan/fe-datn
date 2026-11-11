@@ -109,7 +109,9 @@ export function ConfigTab({ project: p }: { project: Project }) {
     deadline: toLocal(p.deadline),
   });
   const [ch, setCh] = useState({ allowProfessional: p.allowProfessional, allowLinkGateway: p.allowLinkGateway, allowCollaborative: p.allowCollaborative });
-  const [gate, setGate] = useState({ unit: p.gateUnitPriceVnd ? String(p.gateUnitPriceVnd) : "", budget: p.gateBudgetVnd ? String(p.gateBudgetVnd) : "" });
+  const [gate, setGate] = useState({ budget: p.gateBudgetVnd ? String(p.gateBudgetVnd) : "" });
+  // Đơn giá nhãn khách vãng lai do admin đặt (setting) — chỉ hiển thị.
+  const gateUnit = rdy.data?.gateUnitPriceVnd ?? p.gateUnitPriceVnd;
   const [el, setEl] = useState({ minLevel: p.minLevel?.toString() ?? "", minReputation: p.minReputation?.toString() ?? "", requireEntranceTest: p.requireEntranceTest, entranceQuestionCount: String(p.entranceQuestionCount), entrancePassPercent: String(p.entrancePassPercent) });
   const [prot, setProt] = useState({ sensitiveContent: p.sensitiveContent, contentWarning: p.contentWarning ?? "", ndaRequired: p.ndaRequired, ndaText: "", requireVerifiedIdentity: p.requireVerifiedIdentity });
   const [tags, setTags] = useState({ domains: p.domains, languages: p.languages });
@@ -266,7 +268,6 @@ export function ConfigTab({ project: p }: { project: Project }) {
         onSave={() =>
           save("/channels", {
             ...ch,
-            gateUnitPriceVnd: ch.allowLinkGateway ? Number(gate.unit) || 0 : null,
             gateBudgetVnd: ch.allowLinkGateway ? Number(gate.budget) || 0 : null,
           })
         }
@@ -279,14 +280,14 @@ export function ConfigTab({ project: p }: { project: Project }) {
               </AlertDescription>
             </Alert>
           ) : ch.allowLinkGateway ? (
-            <p className="text-xs text-muted-foreground">Cổng link trả theo từng lượt khách gán (đơn giá riêng), tiêu trong ngân sách cổng — không đụng vào tiền thưởng của labeler. Cần câu vàng mục đích “kiểm tra chất lượng”.</p>
+            <p className="text-xs text-muted-foreground">Cổng link trả theo từng nhãn khách vãng lai gán, với đơn giá do hệ thống quy định; tiêu trong ngân sách cổng — không đụng vào tiền thưởng của labeler. Cần câu vàng mục đích “kiểm tra chất lượng”.</p>
           ) : null
         }
       >
         {ch.allowLinkGateway && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Đơn giá cổng link / nhãn khách gán (đ)">
-              <Input type="number" min={0} value={gate.unit} onChange={(e) => setGate({ ...gate, unit: e.target.value })} />
+            <Field label="Đơn giá mỗi nhãn khách vãng lai" hint="Do hệ thống quy định, doanh nghiệp không đổi được. Chốt vào dự án lúc publish.">
+              <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium tabular-nums">{formatVnd(gateUnit)} / nhãn</div>
             </Field>
             <Field label="Ngân sách cổng link (đ)" hint="Cộng vào ký quỹ">
               <Input type="number" min={0} value={gate.budget} onChange={(e) => setGate({ ...gate, budget: e.target.value })} />

@@ -198,6 +198,8 @@ export type Readiness = {
   qualityGoldCount: number;
   entranceGoldCount: number;
   platformFeePercent: number;
+  /** Đơn giá mỗi nhãn khách vãng lai (cổng link) — do ADMIN đặt, doanh nghiệp chỉ được thông báo. */
+  gateUnitPriceVnd: number;
   platformFeePerPassVnd: number;
   estimatedCostVnd: number;
   limits: ProjectLimits;

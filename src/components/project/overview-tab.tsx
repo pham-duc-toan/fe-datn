@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CircleDashed, Flag, Pause, Play, XOctagon } from "lucide-react";
@@ -20,7 +21,8 @@ import { FreeTextNotice, hasFreeText } from "./free-text-notice";
 import type { AttemptSummary, Progress as ProgressT, Project, Readiness } from "@/lib/types";
 
 const ESCROW_STATE: Record<string, string> = { active: "đang giữ", closing: "đang chờ trả nốt thưởng", closed: "đã đóng" };
-import { useSetProject } from "./use-project";
+import { readinessRefetch, useSetProject } from "./use-project";
+import { DeleteProjectButton } from "./delete-project";
 
 const CLOSE_REASON: Record<string, string> = {
   da_co_bai_nop: "Đã có bài nộp — không huỷ được nữa. Dùng “Kết thúc sớm” để chấm các bài đã nộp và hoàn phần suất thừa.",
@@ -43,14 +45,15 @@ function CloseCheck({ data }: { data: Record<string, unknown> }) {
 
 export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t: string) => void }) {
   const qc = useQueryClient();
+  const router = useRouter();
   const setProject = useSetProject(p.id);
   const published = !["draft", "pendingEscrow"].includes(p.status) || p.publishedAt;
   const readiness = useQuery({
     queryKey: ["readiness", p.id],
     queryFn: () => api<Readiness>(`/projects/${p.id}/readiness`),
     enabled: p.status === "draft",
-    // Video đang chuẩn bị: tự cập nhật checklist tới khi xong.
-    refetchInterval: (q) => ((q.state.data?.videoPreparingCount ?? 0) > 0 ? 5000 : false),
+    // Còn file đang xử lý (nạp mẫu, chuẩn bị video): tự cập nhật tới khi xong.
+    refetchInterval: readinessRefetch,
   });
   const progress = useQuery({ queryKey: ["progress", p.id], queryFn: () => api<ProgressT>(`/tasks/projects/${p.id}/progress`), enabled: Boolean(published), refetchInterval: 20000 });
   // Bài đạt (kể cả khiếu nại được chấp nhận) — có ngay khi chấm xong, trước khi dự án chốt.
@@ -288,6 +291,24 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
           />
         </CardContent>
       </Card>
+      {(p.status === "draft" || (p.status === "cancelled" && !p.publishedAt)) && (
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle>Xoá dự án</CardTitle>
+            <CardDescription>Dự án chưa từng publish nên chưa có tiền ký quỹ hay bài làm: xoá hẳn được, kèm toàn bộ dữ liệu đã nạp.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeleteProjectButton
+              id={p.id}
+              name={p.name}
+              onDeleted={() => {
+                void qc.invalidateQueries({ queryKey: ["projects"] });
+                router.push("/du-an");
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

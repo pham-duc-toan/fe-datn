@@ -22,6 +22,7 @@ import { formatBytes } from "@/lib/format";
 import { ingestState, type Tone } from "@/lib/labels";
 import type { IngestResult, IngestStatus, Paged, Project, Sample } from "@/lib/types";
 import { useUrlPage } from "@/lib/use-url-state";
+import { ManualRows } from "./manual-rows";
 
 const ACCEPT: Record<string, string> = {
   image: ".jpg,.jpeg,.png,.webp",
@@ -154,7 +155,7 @@ function UploadRow({ r }: { r: Row }) {
 }
 
 /** Ô mẫu chưa vào bài được (đang chờ / đang xử lý / lỗi): không có link xem, chỉ báo trạng thái. */
-function PendingTile({ s }: { s: Sample }) {
+export function PendingTile({ s }: { s: Sample }) {
   const entry = ingestState(s.ingestState);
   return (
     <div className="flex h-28 flex-col items-center justify-center gap-2 rounded bg-muted p-2 text-center">
@@ -341,15 +342,8 @@ export function DataTab({ project: p }: { project: Project }) {
     }
   }
 
-  async function submitRows() {
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    let parsed: unknown[];
-    try {
-      parsed = lines.map((l) => JSON.parse(l));
-    } catch {
-      toast.error("Mỗi dòng phải là một JSON hợp lệ");
-      return;
-    }
+  /** Gửi các dòng (đã đúng định dạng) — chia nhiều lần nếu hơn 1.000 dòng. Trả true khi gửi xong. */
+  async function postRows(parsed: unknown[]): Promise<boolean> {
     setBusy(true);
     try {
       const total: IngestResult = { received: 0, ready: 0, queued: 0, skipped: 0, errors: [], accepted: [] };
@@ -361,14 +355,27 @@ export function DataTab({ project: p }: { project: Project }) {
         total.errors.push(...res.errors.map((e) => (i === 0 ? e : `(đợt ${i / ROWS_PER_REQUEST + 1}) ${e}`)));
       }
       setTextResult(total);
-      setText("");
       toast.success(`Đã nạp ${total.ready} mẫu`);
+      return true;
     } catch (e) {
       toast.error(errorMessage(e));
+      return false;
     } finally {
       setBusy(false);
       refresh();
     }
+  }
+
+  async function submitRows() {
+    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    let parsed: unknown[];
+    try {
+      parsed = lines.map((l) => JSON.parse(l));
+    } catch {
+      toast.error("Mỗi dòng phải là một JSON hợp lệ");
+      return;
+    }
+    if (await postRows(parsed)) setText("");
   }
 
   async function removeFailed() {
@@ -397,11 +404,12 @@ export function DataTab({ project: p }: { project: Project }) {
             <CardDescription>Mỗi mẫu thành một câu trong bài của labeler khi dự án chạy. File lỗi hay trùng được báo riêng, không làm hỏng các file còn lại.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Tabs defaultValue={isFile ? "files" : "rows"}>
+            <Tabs defaultValue={isFile ? "files" : "manual"}>
               <TabsList className="flex-wrap">
                 {isFile && <TabsTrigger value="files">Tải file lên</TabsTrigger>}
                 {p.modality === "image" && <TabsTrigger value="zip">File ZIP ảnh</TabsTrigger>}
-                {!isFile && <TabsTrigger value="rows">Dán JSONL</TabsTrigger>}
+                {!isFile && <TabsTrigger value="manual">Nhập tay</TabsTrigger>}
+                {!isFile && <TabsTrigger value="rows">Dán JSONL (hàng loạt)</TabsTrigger>}
                 {isFile && <TabsTrigger value="import">Nhập từ nguồn ngoài</TabsTrigger>}
               </TabsList>
               {isFile && (
@@ -443,6 +451,30 @@ export function DataTab({ project: p }: { project: Project }) {
                       {busy ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />} Chọn file ZIP
                     </span>
                   </label>
+                </TabsContent>
+              )}
+              {!isFile && (
+                <TabsContent value="manual" className="space-y-2 pt-3">
+                  <p className="text-sm text-muted-foreground">
+                    Điền từng mẫu vào ô bên dưới — không cần biết JSON. Có nhiều mẫu sẵn trong file thì dùng tab “Dán JSONL”. Văn bản được nạp ngay, không phải chờ.
+                  </p>
+                  <ManualRows modality={p.modality} busy={busy} onSubmit={postRows} />
+                  {textResult && (
+                    <Alert variant={textResult.skipped > 0 ? "destructive" : "default"}>
+                      <AlertTitle>
+                        Đã nạp {textResult.ready} mẫu{textResult.skipped > 0 ? `, bỏ qua ${textResult.skipped} dòng` : ""}
+                      </AlertTitle>
+                      {textResult.errors.length > 0 && (
+                        <AlertDescription>
+                          <ul className="list-disc pl-4">
+                            {textResult.errors.map((e, i) => (
+                              <li key={i}>{e}</li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      )}
+                    </Alert>
+                  )}
                 </TabsContent>
               )}
               {!isFile && (

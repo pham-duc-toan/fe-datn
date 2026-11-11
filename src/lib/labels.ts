@@ -237,6 +237,7 @@ export const APPROVAL_KIND: Record<string, string> = {
   appeal: "Khiếu nại bài làm",
   link: "Báo cáo link",
   referral: "Giới thiệu nghi lạm dụng",
+  manual: "Việc cần xử lý tay",
 };
 
 export const FRAUD_TYPE: Record<string, string> = {

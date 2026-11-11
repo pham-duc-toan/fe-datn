@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye } from "lucide-react";
+import { ChevronRight, Eye } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,19 +12,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/common/page-header";
 import { ActionDialog } from "@/components/common/action-dialog";
-import { JsonView } from "@/components/common/misc";
+import { JsonView, KeyValue } from "@/components/common/misc";
 import { Pager } from "@/components/common/pager";
 import { Loading, QueryState } from "@/components/common/states";
 import { StatusBadge } from "@/components/common/status-badge";
 import { UserName } from "@/components/common/user-name";
 import { api, post } from "@/lib/api";
-import { formatDateTime, formatNumber, shortId } from "@/lib/format";
+import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import { FRAUD_TYPE, genericStatus } from "@/lib/labels";
 import type { Paged } from "@/lib/types";
 import { useUrlPage, useUrlState } from "@/lib/use-url-state";
 
 type Case = { id: string; type: string; projectId: string | null; userIds: string[]; evidence: Record<string, unknown>; status: string; createdAt: string; updatedAt: string; resolvedAt: string | null; note: string | null; blocked: boolean };
 type CaseDetail = Case & { users: { userId: string; submissions: number; medianWorkSeconds: number | null; reputation: number | null }[] };
+
+const sec = (v: unknown) => (typeof v === "number" ? (v >= 3600 ? formatDuration(v) : `${formatNumber(v, v < 10 ? 1 : 0)} giây`) : "—");
+
+/** Bằng chứng do hệ thống chống gian lận ghi lại, viết bằng lời. */
+function Evidence({ ev }: { ev: Record<string, unknown> }) {
+  const items: [ReactNode, ReactNode][] = [];
+  if (typeof ev.secondsPerQuestion === "number") items.push(["Trung bình mỗi câu", sec(ev.secondsPerQuestion)]);
+  if (typeof ev.thresholdSeconds === "number") items.push(["Dưới mức này bị coi là quá nhanh", sec(ev.thresholdSeconds)]);
+  if (ev.projectMedianSeconds !== undefined) items.push(["Người khác trong dự án thường mất", sec(ev.projectMedianSeconds)]);
+  if (typeof ev.answeredCount === "number") items.push(["Số câu đã trả lời", formatNumber(ev.answeredCount)]);
+  if (typeof ev.streak === "number") items.push(["Chọn cùng một đáp án liên tiếp", `${formatNumber(ev.streak)} câu`]);
+  if (ev.answer !== undefined) items.push(["Đáp án lặp lại", String(ev.answer)]);
+  if (typeof ev.otherLabelersDistinctAnswers === "number") items.push(["Người khác chọn", `${ev.otherLabelersDistinctAnswers} đáp án khác nhau`]);
+  if (typeof ev.client_ip === "string") items.push(["Cùng địa chỉ IP", ev.client_ip]);
+  if (typeof ev.device_id === "string") items.push(["Cùng thiết bị", <span key="d" className="break-all">{ev.device_id}</span>]);
+  if (typeof ev.accounts === "number") items.push(["Số tài khoản dùng chung", formatNumber(ev.accounts)]);
+  if (typeof ev.windowSeconds === "number") items.push(["Trong khoảng", formatDuration(ev.windowSeconds)]);
+  return items.length ? <KeyValue items={items} className="sm:grid-cols-1" /> : <p className="text-sm text-muted-foreground">Không có thông tin thêm.</p>;
+}
 
 function Detail({ id, onDone }: { id: string; onDone: () => void }) {
   const q = useQuery({ queryKey: ["fraud", id], queryFn: () => api<CaseDetail>(`/quality/admin/fraud-cases/${id}`) });
@@ -32,7 +53,15 @@ function Detail({ id, onDone }: { id: string; onDone: () => void }) {
   return (
     <div className="space-y-4 px-4 pb-6">
       <p className="text-sm">
-        <b>{FRAUD_TYPE[c.type] ?? c.type}</b> · dự án {c.projectId ? shortId(c.projectId) : "—"} · cập nhật {formatDateTime(c.updatedAt)}
+        <b>{FRAUD_TYPE[c.type] ?? c.type}</b> ·{" "}
+        {c.projectId ? (
+          <Link href={`/admin/du-an/${c.projectId}`} className="text-primary hover:underline">
+            xem dự án
+          </Link>
+        ) : (
+          "không gắn dự án"
+        )}{" "}
+        · cập nhật {formatDateTime(c.updatedAt)}
       </p>
       <Table>
         <TableHeader>
@@ -56,9 +85,17 @@ function Detail({ id, onDone }: { id: string; onDone: () => void }) {
           ))}
         </TableBody>
       </Table>
-      <div>
-        <p className="mb-1 text-sm font-medium">Bằng chứng</p>
-        <JsonView value={c.evidence} />
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Bằng chứng</p>
+        <Evidence ev={c.evidence} />
+        <Collapsible>
+          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <ChevronRight className="size-3" /> Dữ liệu gốc (dành cho đội kỹ thuật)
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <JsonView value={c.evidence} />
+          </CollapsibleContent>
+        </Collapsible>
       </div>
       {c.status === "open" && (
         <div className="flex gap-2">

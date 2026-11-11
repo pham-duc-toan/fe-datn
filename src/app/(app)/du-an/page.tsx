@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
+import { DeleteProjectButton } from "@/components/project/delete-project";
 import { api } from "@/lib/api";
 import { formatDate, formatVnd } from "@/lib/format";
 import { MODALITY_LABEL, PROJECT_STATUS, projectStatus, VISIBILITY_LABEL } from "@/lib/labels";
@@ -20,6 +21,7 @@ import { useUrlPage, useUrlState } from "@/lib/use-url-state";
 export default function MyProjectsPage() {
   const [page, setPage] = useUrlPage();
   const [status, setStatus] = useUrlState("status", "all");
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["projects", "mine", page, status],
     queryFn: () => api<Paged<ProjectListItem>>("/projects", { query: { mine: true, page, pageSize: 20, status: status === "all" ? undefined : status } }),
@@ -66,6 +68,7 @@ export default function MyProjectsPage() {
                       <TableHead className="text-right">Thưởng / suất</TableHead>
                       <TableHead>Hạn chót</TableHead>
                       <TableHead>Trạng thái</TableHead>
+                      <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -85,6 +88,11 @@ export default function MyProjectsPage() {
                         <TableCell>{formatDate(p.deadline)}</TableCell>
                         <TableCell>
                           <StatusBadge entry={projectStatus(p.status)} />
+                        </TableCell>
+                        <TableCell>
+                          {p.isOwner && p.status === "draft" && (
+                            <DeleteProjectButton compact id={p.id} name={p.name} onDeleted={() => void qc.invalidateQueries({ queryKey: ["projects"] })} />
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -32,7 +32,7 @@ export default function AdminProjectsPage() {
                 <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
                   <div>
                     <CardTitle>
-                      <Link href={`/du-an/${p.id}`} className="hover:underline">
+                      <Link href={`/admin/du-an/${p.id}`} className="hover:underline">
                         {p.name}
                       </Link>
                     </CardTitle>
@@ -40,7 +40,10 @@ export default function AdminProjectsPage() {
                       {MODALITY_LABEL[p.modality]} · {VISIBILITY_LABEL[p.visibility]} · chủ <UserName id={p.ownerId} />
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" asChild>
+                      <Link href={`/admin/du-an/${p.id}`}>Xem đầy đủ</Link>
+                    </Button>
                     <Button
                       onClick={async () => {
                         try {

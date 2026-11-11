@@ -108,7 +108,7 @@ export default function AdminIdentityPage() {
     <>
       <PageHeader
         title="Xác minh danh tính"
-        description="Mỗi lần mở ảnh giấy tờ đều được ghi nhật ký audit (ai xem, của ai, lúc nào)."
+        description="Mỗi lần mở ảnh giấy tờ đều được ghi vào nhật ký hoạt động (ai xem, của ai, lúc nào)."
         actions={
           <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
             <SelectTrigger className="w-40">

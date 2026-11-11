@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Loader2, Rocket, XOctagon } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import { errorMessage } from "@/lib/errors";
 import { formatNumber, formatVnd } from "@/lib/format";
 import { kybStatus, READINESS_LABEL, READINESS_WARNING } from "@/lib/labels";
 import type { KybProfile, Project, Readiness } from "@/lib/types";
-import { useSetProject } from "./use-project";
+import { isProcessingData, readinessRefetch, useSetProject } from "./use-project";
 
 /**
  * Checklist publish — ghim ở đầu trang dự án (bên phải khối tên dự án) khi dự án còn nháp, để thấy còn thiếu gì
@@ -24,13 +24,25 @@ export function PublishChecklist({ project: p }: { project: Project }) {
   const readiness = useQuery({
     queryKey: ["readiness", p.id],
     queryFn: () => api<Readiness>(`/projects/${p.id}/readiness`),
-    // Video đang chuẩn bị: tự cập nhật checklist tới khi xong.
-    refetchInterval: (q) => ((q.state.data?.videoPreparingCount ?? 0) > 0 ? 5000 : false),
+    // Còn file đang xử lý (nạp mẫu, chuẩn bị video): tự cập nhật checklist tới khi xong.
+    refetchInterval: readinessRefetch,
   });
   const kyb = useQuery({ queryKey: ["kyb"], queryFn: () => api<KybProfile>("/kyb/me") });
   const [busy, setBusy] = useState(false);
   const r = readiness.data;
   const kybOk = !kyb.data || kyb.data.status === "verified";
+  const processing = isProcessingData(r);
+
+  // File vừa xử lý xong (audio / video / ảnh) → báo ngay để người dùng biết có thể publish.
+  const wasProcessing = useRef(false);
+  useEffect(() => {
+    if (!r) return;
+    if (wasProcessing.current && !processing) {
+      if (r.ready) toast.success("Dữ liệu đã xử lý xong — dự án đủ điều kiện publish.");
+      else toast.info("Dữ liệu đã xử lý xong. Còn mục cần hoàn thiện trong checklist.");
+    }
+    wasProcessing.current = processing;
+  }, [r, processing]);
 
   async function publish() {
     setBusy(true);
@@ -74,6 +86,11 @@ export function PublishChecklist({ project: p }: { project: Project }) {
         ) : (
           <span className="text-xs text-destructive">Còn thiếu {missing + (kybOk ? 0 : 1)} mục</span>
         ))}
+        {processing && (
+          <span className="flex items-center gap-1 text-xs text-sky-700">
+            <Loader2 className="size-3.5 animate-spin" /> Đang xử lý file…
+          </span>
+        )}
       </div>
       <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
         {!kybOk && kyb.data && (
@@ -86,7 +103,11 @@ export function PublishChecklist({ project: p }: { project: Project }) {
         )}
         {r?.missing.map((m) => (
           <p key={m} className="flex items-start gap-1.5">
-            <XOctagon className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+            {m === "du_lieu_dang_xu_ly" || m === "video_dang_chuan_bi" ? (
+              <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin text-sky-600" />
+            ) : (
+              <XOctagon className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+            )}
             <span>
               {READINESS_LABEL[m] ?? m}
               {m === "video_dang_chuan_bi" && <span className="text-muted-foreground"> ({formatNumber(r.videoPreparingCount)} video)</span>}
