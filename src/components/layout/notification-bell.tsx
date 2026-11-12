@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Bell, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { api, post } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { mapNotificationLink } from "@/lib/nav";
@@ -49,14 +48,15 @@ export function NotificationBell({ role }: { role: Role | null }) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-96 p-0">
+      <PopoverContent align="end" collisionPadding={8} className="w-[min(24rem,calc(100vw-1rem))] p-0">
         <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-semibold">Thông báo</span>
           <Button variant="ghost" size="xs" onClick={() => readAll.mutate()} disabled={unread === 0}>
             <CheckCheck /> Đọc hết
           </Button>
         </div>
-        <ScrollArea className="max-h-96">
+        {/* div cuộn thường: ScrollArea của Radix cần chiều cao cố định, max-h không làm nó cuộn → danh sách dài tràn màn hình. */}
+        <div className="max-h-[min(24rem,calc(100dvh-10rem))] overflow-y-auto overscroll-contain">
           {(latest.data?.items ?? []).length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">Chưa có thông báo</p>}
           {(latest.data?.items ?? []).map((n) => (
             <button
@@ -66,15 +66,15 @@ export function NotificationBell({ role }: { role: Role | null }) {
             >
               <div className="flex items-start gap-2">
                 {!n.readAt && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-sm font-medium wrap-anywhere">{n.title}</p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground wrap-anywhere">{n.body}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">{timeAgo(n.createdAt)}</p>
                 </div>
               </div>
             </button>
           ))}
-        </ScrollArea>
+        </div>
         <div className="border-t p-2 text-center">
           <Link href="/thong-bao" className="text-sm text-primary hover:underline">
             Xem tất cả

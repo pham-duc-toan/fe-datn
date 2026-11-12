@@ -54,10 +54,10 @@ export default function NotificationsPage() {
                   <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", n.readAt ? "bg-transparent" : "bg-primary")} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <p className="font-medium">{n.title}</p>
-                      <span className="text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</span>
+                      <p className="min-w-0 font-medium wrap-anywhere">{n.title}</p>
+                      <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{n.body}</p>
+                    <p className="text-sm text-muted-foreground wrap-anywhere">{n.body}</p>
                   </div>
                 </button>
               ))}

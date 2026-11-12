@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/common/page-header";
 import { Pager } from "@/components/common/pager";
-import { QueryState } from "@/components/common/states";
+import { Empty, QueryState } from "@/components/common/states";
 import { ToneBadge } from "@/components/common/status-badge";
 import { useReasonText, useTags } from "@/hooks/use-tags";
 import { api } from "@/lib/api";
@@ -84,7 +84,8 @@ export default function MarketplacePage() {
   const [modality, setModality] = useUrlState("modality", "all");
   const q = useQuery({
     queryKey: ["market", page, modality],
-    queryFn: () => api<Paged<ProjectListItem>>("/projects", { query: { status: "running", page, pageSize: 18, modality: modality === "all" ? undefined : modality } }),
+    // Chỉ dự án bạn làm được ngay: còn nhận bài, còn chỗ, chưa nộp, đủ cấp độ / uy tín / xác minh.
+    queryFn: () => api<Paged<ProjectListItem>>("/projects/market", { query: { page, pageSize: 18, modality: modality === "all" ? undefined : modality } }),
   });
   const rec = useQuery({ queryKey: ["recommended", 6], queryFn: () => api<Rec[]>("/projects/recommended", { query: { limit: 6 } }) });
   const reasonText = useReasonText();
@@ -93,7 +94,7 @@ export default function MarketplacePage() {
     <>
       <PageHeader
         title="Chợ dự án"
-        description="Dự án công khai đang chạy và dự án bạn đã tham gia."
+        description="Những dự án bạn đủ điều kiện và làm được ngay. Dự án đã nộp bài xem ở Bài làm của tôi."
         actions={
           <Select value={modality} onValueChange={(v) => { setModality(v); setPage(1); }}>
             <SelectTrigger className="w-44">
@@ -131,8 +132,17 @@ export default function MarketplacePage() {
           </div>
         </div>
       )}
-      <QueryState query={q} empty={(d) => d.items.length === 0}>
-        {(d) => (
+      <QueryState query={q}>
+        {(d) =>
+          d.items.length === 0 ? (
+            <Empty title="Chưa có dự án phù hợp với bạn">
+              Dự án mới mở sẽ hiện ở đây. Lên cấp, tăng uy tín hoặc{" "}
+              <Link href="/tai-khoan/xac-minh" className="text-primary underline">
+                xác minh danh tính
+              </Link>{" "}
+              để làm được nhiều dự án hơn.
+            </Empty>
+          ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {d.items.map((p) => (
@@ -141,7 +151,8 @@ export default function MarketplacePage() {
             </div>
             <Pager page={d.page} pageSize={d.pageSize} total={d.total} onChange={setPage} />
           </>
-        )}
+          )
+        }
       </QueryState>
     </>
   );

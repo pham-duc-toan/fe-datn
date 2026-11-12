@@ -38,6 +38,7 @@ export default function LabelerProjectPage() {
   const slots = useQuery({ queryKey: ["slots", id], queryFn: () => api<Slots>(`/tasks/projects/${id}/slots`), retry: false });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openedAt] = useState(() => Date.now());
   const { name: tagName } = useTags();
 
   if (q.isPending) return <Loading />;
@@ -49,6 +50,8 @@ export default function LabelerProjectPage() {
   const lowLevel = p.minLevel !== null && lv && lv.level < p.minLevel;
   const lowRep = p.minReputation !== null && lv && (lv.reputation ?? 0) < p.minReputation;
   const needConsent = p.consentRequired && terms.data && !terms.data.myConsentValid;
+  // Quá hạn chót: hệ thống đóng thu bài sau ít giây — không mời bắt đầu / tham gia trong khoảng đó.
+  const pastDeadline = p.deadline !== null && new Date(p.deadline).getTime() <= openedAt;
 
   async function join() {
     setBusy(true);
@@ -205,11 +208,11 @@ export default function LabelerProjectPage() {
                           </Button>
                         </div>
                       );
-                    const open = p.status === "running" && (slots.data?.phase ?? "open") === "open" && (slots.data?.available ?? 1) > 0;
+                    const open = p.status === "running" && !pastDeadline && (slots.data?.phase ?? "open") === "open" && (slots.data?.available ?? 1) > 0;
                     if (!open)
                       return (
                         <Button className="w-full" disabled>
-                          <PlayCircle /> {slots.data && slots.data.available <= 0 ? "Đã đủ người làm" : "Dự án không nhận bài"}
+                          <PlayCircle /> {pastDeadline ? "Đã quá hạn chót" : slots.data && slots.data.available <= 0 ? "Đã đủ người làm" : "Dự án không nhận bài"}
                         </Button>
                       );
                     return (
@@ -291,7 +294,7 @@ export default function LabelerProjectPage() {
                   </div>
                 )
               ) : (
-                <Button className="w-full" onClick={() => void join()} disabled={busy || Boolean(lowLevel || lowRep) || p.status !== "running"}>
+                <Button className="w-full" onClick={() => void join()} disabled={busy || Boolean(lowLevel || lowRep) || p.status !== "running" || pastDeadline}>
                   {busy && <Loader2 className="animate-spin" />} Tham gia dự án
                 </Button>
               )}
