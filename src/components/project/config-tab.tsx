@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Field, Markdown } from "@/components/common/misc";
 import { TagPicker } from "@/components/common/tag-picker";
-import { api, put } from "@/lib/api";
+import { api, patch } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatVnd } from "@/lib/format";
 import { TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
@@ -82,12 +82,15 @@ function SaveCard({ title, description, children, onSave, disabled, note }: { ti
   );
 }
 
+type ProjectPatchGroup = "info" | "labelSchema" | "guideline" | "pricing" | "channels" | "eligibility" | "protection" | "tags" | "retention";
+
 export function ConfigTab({ project: p }: { project: Project }) {
   const setProject = useSetProject(p.id);
   const qc = useQueryClient();
   const draft = p.status === "draft";
-  const save = async (path: string, body: unknown) => {
-    const r = await put<Project>(`/projects/${p.id}${path}`, body);
+  // PATCH /projects/{id} theo NHÓM: mỗi thẻ gửi đúng một nhóm (đủ trường của nhóm đó).
+  const save = async (group: ProjectPatchGroup, body: unknown) => {
+    const r = await patch<Project>(`/projects/${p.id}`, { [group]: body });
     setProject(r);
     return r;
   };
@@ -136,7 +139,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
           <AlertDescription>Dự án đã publish: tập nhãn, tiền thưởng, số suất, ngưỡng đạt, dữ liệu, câu vàng, điều kiện không sửa được nữa.</AlertDescription>
         </Alert>
       )}
-      <SaveCard title="Thông tin dự án" onSave={() => save("", { name, description: desc, visibility: vis })}>
+      <SaveCard title="Thông tin dự án" onSave={() => save("info", { name, description: desc, visibility: vis })}>
         <Field label="Tên">
           <Input value={name} maxLength={200} onChange={(e) => setName(e.target.value)} />
         </Field>
@@ -154,11 +157,11 @@ export function ConfigTab({ project: p }: { project: Project }) {
         </Field>
       </SaveCard>
 
-      <SaveCard title="Tập nhãn" onSave={() => save("/label-schema", { ...schema, modality: p.modality })} disabled={!draft}>
+      <SaveCard title="Tập nhãn" onSave={() => save("labelSchema", { ...schema, modality: p.modality })} disabled={!draft}>
         <SchemaEditor modality={p.modality} value={schema} onChange={setSchema} projectName={name} thresholds={lim?.matchThresholds} />
       </SaveCard>
 
-      <SaveCard title="Hướng dẫn gán nhãn" description="Markdown; hiển thị cho labeler trước khi làm. Ví dụ đúng / sai giúp labeler hiểu nhanh." onSave={() => save("/guideline", guide)} disabled={!draft}>
+      <SaveCard title="Hướng dẫn gán nhãn" description="Markdown; hiển thị cho labeler trước khi làm. Ví dụ đúng / sai giúp labeler hiểu nhanh." onSave={() => save("guideline", guide)} disabled={!draft}>
         <Tabs defaultValue="sua">
           <TabsList>
             <TabsTrigger value="sua">Soạn</TabsTrigger>
@@ -198,7 +201,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         description="Tiền tính cho CẢ DỰ ÁN: mỗi labeler làm hết các câu rồi nộp một bài. Bài đạt = giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra. Mỗi suất thưởng trao cho một bài đạt, theo thứ tự nộp sớm nhất; số người được làm nhiều hơn số suất để đa số chắc hơn."
         disabled={!draft}
         onSave={() =>
-          save("/pricing", {
+          save("pricing", {
             rewardVnd: reward,
             slots,
             passThresholdPercent: t,
@@ -266,7 +269,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         title="Kênh thu thập"
         disabled={!draft}
         onSave={() =>
-          save("/channels", {
+          save("channels", {
             ...ch,
             gateBudgetVnd: ch.allowLinkGateway ? Number(gate.budget) || 0 : null,
           })
@@ -315,7 +318,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         title="Điều kiện tham gia"
         disabled={!draft}
         onSave={() =>
-          save("/eligibility", {
+          save("eligibility", {
             minLevel: el.minLevel ? Number(el.minLevel) : null,
             minReputation: el.minReputation ? Number(el.minReputation) : null,
             requireEntranceTest: el.requireEntranceTest,
@@ -352,9 +355,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         description="Dự án nhạy cảm chỉ nhận người đã xác minh danh tính và đủ tuổi, phải đồng ý cảnh báo trước; mẫu được che cho tới khi bấm hiện."
         disabled={!draft}
         onSave={async () => {
-          // /protection trả về điều khoản (không phải dự án) — tải lại dự án thay vì ghi đè.
-          await put(`/projects/${p.id}/protection`, { ...prot, contentWarning: prot.contentWarning || null, ndaText: prot.ndaRequired ? prot.ndaText || null : null });
-          await qc.invalidateQueries({ queryKey: ["project", p.id] });
+          await save("protection", { ...prot, contentWarning: prot.contentWarning || null, ndaText: prot.ndaRequired ? prot.ndaText || null : null });
           void qc.invalidateQueries({ queryKey: ["readiness", p.id] });
           void qc.invalidateQueries({ queryKey: ["terms", p.id] });
         }}
@@ -384,7 +385,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         <SaveCard
           title="Chủ đề (để gợi ý labeler)"
           description="Labeler có thẻ trùng với dự án sẽ thấy dự án trong mục gợi ý."
-          onSave={() => save("/tags", { domains: tags.domains, languages: tags.languages })}
+          onSave={() => save("tags", { domains: tags.domains, languages: tags.languages })}
         >
           <Field label="Lĩnh vực">
             <TagPicker kind="domain" value={tags.domains} onChange={(v) => setTags({ ...tags, domains: v })} />
@@ -393,7 +394,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
             <TagPicker kind="language" value={tags.languages} onChange={(v) => setTags({ ...tags, languages: v })} />
           </Field>
         </SaveCard>
-        <SaveCard title="Lưu trữ file" description="Đồng ý để hệ thống xoá file gốc khi dự án đóng quá hạn giữ." onSave={() => save("/retention", { deleteFilesAfterClose: retention })}>
+        <SaveCard title="Lưu trữ file" description="Đồng ý để hệ thống xoá file gốc khi dự án đóng quá hạn giữ." onSave={() => save("retention", { deleteFilesAfterClose: retention })}>
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={retention} onCheckedChange={setRetention} /> Xoá file gốc sau khi đóng
           </label>

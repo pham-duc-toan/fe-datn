@@ -27,7 +27,7 @@ export class ApiError extends Error {
 export type Query = Record<string, string | number | boolean | null | undefined>;
 
 export type ApiOptions = {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   query?: Query;
   headers?: Record<string, string>;
@@ -178,6 +178,7 @@ export const get = <T,>(path: string, query?: Query) => api<T>(path, { query });
 export const post = <T,>(path: string, body?: unknown, extra?: Omit<ApiOptions, "body" | "method">) =>
   api<T>(path, { ...extra, method: "POST", body: body ?? {} });
 export const put = <T,>(path: string, body?: unknown) => api<T>(path, { method: "PUT", body: body ?? {} });
+export const patch = <T,>(path: string, body?: unknown) => api<T>(path, { method: "PATCH", body: body ?? {} });
 export const del = <T,>(path: string) => api<T>(path, { method: "DELETE" });
 
 function fileNameFrom(res: Response, fallback: string): string {

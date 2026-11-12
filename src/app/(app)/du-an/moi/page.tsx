@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { PageHeader } from "@/components/common/page-header";
 import { Field } from "@/components/common/misc";
-import { api, post, put } from "@/lib/api";
+import { api, patch, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatVnd } from "@/lib/format";
 import { MODALITY_LABEL, TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
@@ -40,8 +40,11 @@ export default function NewProjectPage() {
     try {
       const p = await post<Project>("/projects", { name: name.trim(), description: desc.trim(), modality: tpl?.modality ?? modality, visibility: vis });
       // Tạo từ mẫu: chép tập nhãn + hướng dẫn sang dự án, không tham chiếu mẫu (mục 17.10).
-      if (tpl?.labelSchema) await put(`/projects/${p.id}/label-schema`, { ...tpl.labelSchema, modality: tpl.modality });
-      if (tpl?.guidelineMarkdown) await put(`/projects/${p.id}/guideline`, { markdown: tpl.guidelineMarkdown, examples: [] });
+      // Mẫu dự án: tập nhãn + hướng dẫn trong MỘT lần PATCH (tập nhãn được áp trước hướng dẫn).
+      const nhom: Record<string, unknown> = {};
+      if (tpl?.labelSchema) nhom.labelSchema = { ...tpl.labelSchema, modality: tpl.modality };
+      if (tpl?.guidelineMarkdown) nhom.guideline = { markdown: tpl.guidelineMarkdown, examples: [] };
+      if (Object.keys(nhom).length > 0) await patch(`/projects/${p.id}`, nhom);
       toast.success("Đã tạo dự án");
       router.push(`/du-an/${p.id}?tab=cau-hinh`);
     } catch (e) {

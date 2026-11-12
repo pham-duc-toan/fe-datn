@@ -73,9 +73,14 @@ export function QualityTab({ project: p }: { project: Project }) {
             <Card>
               <CardHeader>
                 <CardTitle>Mức đồng thuận theo công cụ</CardTitle>
-                <CardDescription>Krippendorff alpha: 1 = nhất trí hoàn toàn, ≤ 0 = như đoán bừa.</CardDescription>
+                <CardDescription>Krippendorff alpha: 1 = nhất trí hoàn toàn, ≤ 0 = như đoán bừa. Tính một lần sau khi chấm, khi đã đủ bài của mọi người.</CardDescription>
               </CardHeader>
               <CardContent>
+                {s.tools.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {s.gradedAt ? "Đang tính, vui lòng xem lại sau ít phút." : "Có sau khi dự án đóng thu bài và chấm xong."}
+                  </p>
+                ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -102,6 +107,7 @@ export function QualityTab({ project: p }: { project: Project }) {
                     ))}
                   </TableBody>
                 </Table>
+                )}
               </CardContent>
             </Card>
           </>
@@ -111,7 +117,7 @@ export function QualityTab({ project: p }: { project: Project }) {
         <CardHeader>
           <CardTitle>Từng bài làm</CardTitle>
           <CardDescription>
-            Giống đa số = số câu khớp kết quả gộp / số câu so được (câu bỏ trống tính là không khớp). Kỹ năng Dawid–Skene (0–1) cần ≥ 5 nhãn; STAPLE chỉ để tham khảo.
+            Giống đa số = số câu khớp kết quả gộp / số câu so được (câu bỏ trống tính là không khớp). Kỹ năng Dawid–Skene (0–1) cần ≥ 5 nhãn, có sau khi chấm; STAPLE chỉ để tham khảo.
           </CardDescription>
         </CardHeader>
         <CardContent>
