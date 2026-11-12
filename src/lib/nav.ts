@@ -32,7 +32,7 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
   admin: [
     { href: "/admin", label: "Tổng quan", icon: Home, exact: true },
-    { href: "/admin/duyet", label: "Hàng đợi duyệt", icon: ClipboardCheck },
+    { href: "/admin/viec-tay", label: "Việc cần xử lý tay", icon: ClipboardCheck },
     { href: "/admin/kyb", label: "Hồ sơ KYB", icon: Building2 },
     { href: "/admin/xac-minh", label: "Xác minh danh tính", icon: Fingerprint },
     { href: "/admin/du-an", label: "Dự án chờ duyệt", icon: Briefcase },

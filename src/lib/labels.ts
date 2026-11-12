@@ -229,17 +229,6 @@ export const HISTORY_ACTION: Record<string, string> = {
   appeal_accepted: "Vào kết quả sau khiếu nại",
 };
 
-export const APPROVAL_KIND: Record<string, string> = {
-  kyb: "Hồ sơ doanh nghiệp",
-  identity: "Xác minh danh tính",
-  project: "Dự án",
-  withdrawal: "Rút tiền",
-  appeal: "Khiếu nại bài làm",
-  link: "Báo cáo link",
-  referral: "Giới thiệu nghi lạm dụng",
-  manual: "Việc cần xử lý tay",
-};
-
 export const FRAUD_TYPE: Record<string, string> = {
   qua_nhanh: "Làm quá nhanh",
   mot_nhan_lien_tuc: "Chọn một lớp liên tục",

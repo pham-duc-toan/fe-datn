@@ -4,16 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertOctagon, AlertTriangle, CheckCircle2, ClipboardCheck } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/common/page-header";
 import { Field, StatCard } from "@/components/common/misc";
-import { ToneBadge } from "@/components/common/status-badge";
 import { api } from "@/lib/api";
 import { daysAgo, formatDateTime, formatNumber, formatVnd, isoDay } from "@/lib/format";
-import { APPROVAL_KIND } from "@/lib/labels";
 
 type Overview = {
   auditSince: string | null;
@@ -69,12 +67,24 @@ function HealthCard({ h }: { h: SystemHealth | undefined }) {
   );
 }
 
+/** Loi tat toi tung trang duyet (hang doi duyet chung da bo — moi loai don duyet o trang rieng). */
+const DUYET: { href: string; label: string }[] = [
+  { href: "/admin/du-an", label: "Dự án chờ duyệt" },
+  { href: "/admin/kyb", label: "Hồ sơ doanh nghiệp (KYB)" },
+  { href: "/admin/xac-minh", label: "Xác minh danh tính" },
+  { href: "/admin/rut-tien", label: "Duyệt rút tiền" },
+  { href: "/admin/nap-tien", label: "Nạp chuyển khoản" },
+  { href: "/admin/khieu-nai", label: "Khiếu nại bài làm" },
+  { href: "/admin/link", label: "Link bị báo cáo" },
+  { href: "/admin/link?tab=gioi-thieu", label: "Giới thiệu nghi lạm dụng" },
+  { href: "/admin/viec-tay", label: "Việc cần xử lý tay" },
+];
+
 export default function AdminHome() {
   const [from, setFrom] = useState(daysAgo(29));
   const [to, setTo] = useState(isoDay(new Date()));
   const ov = useQuery({ queryKey: ["admin-overview", from, to], queryFn: () => api<Overview>("/admin/stats/overview", { query: { from, to } }) });
   const rec = useQuery({ queryKey: ["reconciliation"], queryFn: () => api<{ healthy: boolean; entryCount: number; unbalancedEntries: string[]; balanceMismatches: string[]; negativeAccounts: string[]; brokenChain: number[] }>("/ledger/admin/reconciliation") });
-  const sum = useQuery({ queryKey: ["approvals-summary"], queryFn: () => api<{ totalPending: number; kinds: { kind: string; pending: number; oldestWaitingHours: number | null }[] }>("/admin/approvals/summary"), refetchInterval: 30000 });
   const health = useQuery({ queryKey: ["system-health"], queryFn: () => api<SystemHealth>("/admin/system-health"), refetchInterval: 60000 });
   const o = ov.data;
 
@@ -141,23 +151,15 @@ export default function AdminHome() {
           <HealthCard h={health.data} />
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Chờ duyệt <ToneBadge tone={sum.data?.totalPending ? "warning" : "success"}>{sum.data?.totalPending ?? 0}</ToneBadge>
-              </CardTitle>
+              <CardTitle>Việc cần duyệt</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1.5 text-sm">
-              {(sum.data?.kinds ?? []).map((k) => (
-                <Link key={k.kind} href={`/admin/duyet?kind=${k.kind}`} className="flex items-center justify-between rounded px-1 py-0.5 hover:bg-muted">
-                  <span>{APPROVAL_KIND[k.kind] ?? k.kind}</span>
-                  <span className="text-muted-foreground">
-                    {k.pending}
-                    {k.oldestWaitingHours ? ` · lâu nhất ${Math.round(k.oldestWaitingHours)} giờ` : ""}
-                  </span>
+              {DUYET.map((d) => (
+                <Link key={d.href} href={d.href} className="flex items-center justify-between rounded px-1 py-0.5 hover:bg-muted">
+                  <span>{d.label}</span>
+                  <ChevronRight className="size-4 text-muted-foreground" />
                 </Link>
               ))}
-              <Link href="/admin/duyet" className="mt-2 inline-flex items-center gap-1 text-primary hover:underline">
-                <ClipboardCheck className="size-4" /> Mở hàng đợi
-              </Link>
             </CardContent>
           </Card>
         </div>

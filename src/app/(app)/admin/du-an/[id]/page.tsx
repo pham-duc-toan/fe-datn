@@ -59,7 +59,6 @@ export default function AdminProjectDetailPage() {
   const done = () => {
     void qc.invalidateQueries({ queryKey: ["admin-project", id] });
     void qc.invalidateQueries({ queryKey: ["pending-projects"] });
-    void qc.invalidateQueries({ queryKey: ["approvals"] });
   };
 
   return (
