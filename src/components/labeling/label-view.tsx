@@ -36,6 +36,7 @@ export function LabelView({ a }: { a: Annotation }) {
           modality={p.modality}
           fileUrl={a.fileUrl}
           content={a.sampleContent}
+          question={a.sampleQuestion}
           metadata={a.sampleMetadata}
           value={a.payload.data}
           readOnly

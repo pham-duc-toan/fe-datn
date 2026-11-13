@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/page-header";
 import { ActionDialog } from "@/components/common/action-dialog";
-import { KeyValue, Markdown } from "@/components/common/misc";
+import { KeyValue } from "@/components/common/misc";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
 import { StatusBadge, ToneBadge } from "@/components/common/status-badge";
@@ -341,22 +341,14 @@ function SchemaPanel({ p }: { p: Project }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Hướng dẫn gán nhãn</CardTitle>
+          <CardTitle>Câu hỏi chung</CardTitle>
+          <CardDescription>Người làm thấy câu này ở đầu mỗi câu; mẫu có câu hỏi riêng thì hiện câu riêng thay thế.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {p.guideline?.markdown ? <Markdown>{p.guideline.markdown}</Markdown> : <p className="text-sm text-muted-foreground">Chưa có hướng dẫn.</p>}
-          {p.guideline && p.guideline.examples.length > 0 && (
-            <div>
-              <p className="mb-1 text-sm font-medium">Ví dụ ({p.guideline.examples.length})</p>
-              <ul className="space-y-1 text-sm">
-                {p.guideline.examples.map((e, i) => (
-                  <li key={i} className="rounded border px-2 py-1">
-                    <span className={e.isCorrect ? "text-emerald-700" : "text-destructive"}>{e.isCorrect ? "Đúng" : "Sai"}</span> — {e.label}
-                    {e.explanation ? `: ${e.explanation}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <CardContent>
+          {p.labelSchema?.question ? (
+            <p className="rounded-md border bg-muted/40 p-3 text-sm whitespace-pre-wrap">{p.labelSchema.question}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Chưa đặt câu hỏi chung.</p>
           )}
         </CardContent>
       </Card>

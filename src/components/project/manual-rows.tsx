@@ -8,8 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/common/misc";
 import type { Modality } from "@/lib/types";
 
-/** Một mẫu đang soạn tay. text: `a`; pair: `prompt` + `a` + `b`; list: `prompt` + `items`. */
-type Draft = { key: number; name: string; prompt: string; a: string; b: string; items: string[] };
+/** Một mẫu đang soạn tay. text: `a`; pair: `a` + `b`; list: `items`. `question` = câu hỏi riêng (mọi loại). */
+type Draft = { key: number; name: string; question: string; a: string; b: string; items: string[] };
 
 const MIN_ITEMS = 2;
 const MAX_ITEMS = 50;
@@ -18,7 +18,7 @@ let nextKey = 1;
 const blank = (modality: Modality): Draft => ({
   key: nextKey++,
   name: "",
-  prompt: "",
+  question: "",
   a: "",
   b: "",
   items: modality === "list" ? ["", ""] : [],
@@ -28,18 +28,17 @@ const blank = (modality: Modality): Draft => ({
 function toRow(modality: Modality, d: Draft): { row: Record<string, unknown> } | { error: string } {
   const row: Record<string, unknown> = {};
   if (d.name.trim()) row.name = d.name.trim();
+  if (d.question.trim()) row.question = d.question.trim();
   if (modality === "text") {
     if (!d.a.trim()) return { error: "chưa nhập nội dung" };
     row.text = d.a.trim();
   } else if (modality === "pair") {
     if (!d.a.trim() || !d.b.trim()) return { error: "cần cả câu trả lời A và B" };
-    if (d.prompt.trim()) row.prompt = d.prompt.trim();
     row.a = d.a.trim();
     row.b = d.b.trim();
   } else if (modality === "list") {
     const items = d.items.map((x) => x.trim());
     if (items.length < MIN_ITEMS || items.some((x) => !x)) return { error: `cần ít nhất ${MIN_ITEMS} mục, mỗi mục không để trống` };
-    if (d.prompt.trim()) row.prompt = d.prompt.trim();
     row.items = items;
   }
   return { row };
@@ -47,11 +46,34 @@ function toRow(modality: Modality, d: Draft): { row: Record<string, unknown> } |
 
 const LABEL: Record<string, string> = { text: "văn bản", pair: "cặp câu trả lời", list: "danh sách" };
 
+/** Ô câu hỏi RIÊNG của một mẫu — bỏ trống thì labeler thấy câu hỏi chung của dự án. */
+export function QuestionInput({ value, onChange, common }: { value: string; onChange: (v: string) => void; common?: string }) {
+  return (
+    <Field
+      label="Câu hỏi riêng của mẫu (tuỳ chọn)"
+      hint={common ? `Bỏ trống = labeler thấy câu hỏi chung: “${common}”.` : "Bỏ trống = labeler thấy câu hỏi chung của dự án (đặt ở tab Cấu hình)."}
+    >
+      <Input value={value} maxLength={1000} onChange={(e) => onChange(e.target.value)} placeholder={common || "vd: Có bao nhiêu người trong ảnh?"} />
+    </Field>
+  );
+}
+
 /**
  * Nhập mẫu bằng tay cho văn bản / cặp / danh sách — doanh nghiệp không phải biết JSON. Mỗi mẫu một khối;
  * văn bản có thêm "dán nhiều mẫu" (mỗi dòng một mẫu).
  */
-export function ManualRows({ modality, busy, onSubmit }: { modality: Modality; busy: boolean; onSubmit: (rows: Record<string, unknown>[]) => Promise<boolean> }) {
+export function ManualRows({
+  modality,
+  busy,
+  onSubmit,
+  commonQuestion,
+}: {
+  modality: Modality;
+  busy: boolean;
+  onSubmit: (rows: Record<string, unknown>[]) => Promise<boolean>;
+  /** Câu hỏi chung của dự án — gợi ý trong ô câu hỏi riêng (bỏ trống thì dùng câu này). */
+  commonQuestion?: string;
+}) {
   const [drafts, setDrafts] = useState<Draft[]>(() => [blank(modality)]);
   const [bulk, setBulk] = useState("");
   const [errors, setErrors] = useState<Record<number, string>>({});
@@ -71,7 +93,7 @@ export function ManualRows({ modality, busy, onSubmit }: { modality: Modality; b
     const rows: Record<string, unknown>[] = [];
     const bad: Record<number, string> = {};
     for (const d of drafts) {
-      const empty = !d.a.trim() && !d.b.trim() && !d.prompt.trim() && d.items.every((x) => !x.trim());
+      const empty = !d.a.trim() && !d.b.trim() && d.items.every((x) => !x.trim());
       if (empty) continue; // khối trống bỏ qua
       const r = toRow(modality, d);
       if ("error" in r) bad[d.key] = r.error;
@@ -115,11 +137,10 @@ export function ManualRows({ modality, busy, onSubmit }: { modality: Modality; b
               </Field>
             )}
 
+            <QuestionInput value={d.question} onChange={(v) => patch(d.key, { question: v })} common={commonQuestion} />
+
             {modality === "pair" && (
               <>
-                <Field label="Câu hỏi (tuỳ chọn)">
-                  <Input value={d.prompt} onChange={(e) => patch(d.key, { prompt: e.target.value })} />
-                </Field>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Câu trả lời A">
                     <Textarea rows={3} value={d.a} onChange={(e) => patch(d.key, { a: e.target.value })} />
@@ -133,9 +154,6 @@ export function ManualRows({ modality, busy, onSubmit }: { modality: Modality; b
 
             {modality === "list" && (
               <>
-                <Field label="Câu hỏi (tuỳ chọn)">
-                  <Input value={d.prompt} onChange={(e) => patch(d.key, { prompt: e.target.value })} />
-                </Field>
                 <div className="space-y-2">
                   <span className="text-sm font-medium">Các mục cần xếp hạng ({MIN_ITEMS}–{MAX_ITEMS})</span>
                   {d.items.map((it, k) => (

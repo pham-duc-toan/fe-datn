@@ -198,6 +198,14 @@ export function buildPracticeSteps(schema: LabelSchema, demo: DemoSample, only: 
         "Bạn sẽ thử từng công cụ của dự án trên một câu ví dụ. Bài luyện tập KHÔNG tính điểm, KHÔNG lưu và không ảnh hưởng bài thật. " +
         "Mỗi bước có một nhiệm vụ — làm xong thì nút “Tiếp” sáng lên. Không muốn xem? Bấm “Bỏ qua hướng dẫn” bất cứ lúc nào.",
     },
+    {
+      key: "__cau_hoi",
+      title: "Đọc câu hỏi trước",
+      body:
+        "Dòng nổi bật phía trên mẫu là CÂU HỎI của câu: nó cho biết dự án cần bạn trả lời gì về mẫu này. " +
+        "Mỗi câu trong bài thật đều có câu hỏi — có câu dùng câu hỏi chung của dự án, có câu có câu hỏi riêng.",
+      tip: "Dòng chữ nhỏ dưới tên một công cụ (nếu có) là lưu ý riêng của công cụ đó.",
+    },
   ];
 
   for (const t of tools) {
@@ -213,7 +221,7 @@ export function buildPracticeSteps(schema: LabelSchema, demo: DemoSample, only: 
     title: "Sẵn sàng làm bài thật!",
     body:
       "Câu trả lời thật được lưu nháp ngay trên máy này; chỉ khi bấm “Nộp bài” cả bài mới được gửi lên — và chỉ nộp được một lần. " +
-      "Trong bài có lẫn câu kiểm tra (không phân biệt được), bỏ trống câu sẽ bị tính là không giống đa số. Đọc kỹ “Hướng dẫn” của dự án trước khi làm.",
+      "Trong bài có lẫn câu kiểm tra (không phân biệt được), bỏ trống câu sẽ bị tính là không giống đa số. Mỗi câu nhớ đọc câu hỏi trước khi trả lời.",
   });
   return steps;
 }

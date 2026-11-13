@@ -13,6 +13,18 @@ import type { AttributeDef, LabelSchema, Modality, Tool, ToolKind } from "@/lib/
 import { CLASS_TOOLS, LIST_TOOLS, TOOL_LABEL, TOOLS_BY_MODALITY } from "@/lib/labels";
 import { autoToolName } from "@/lib/tool-names";
 import { TOOL_GUIDE, ToolGuideDialog } from "@/components/project/tool-guide";
+import { HelpTip } from "@/components/project/param-help";
+import { QuestionBanner } from "@/components/labeling/workspace";
+
+/** Câu hỏi gợi ý theo loại dữ liệu — chỉ là placeholder, doanh nghiệp tự viết theo bài toán. */
+const QUESTION_PLACEHOLDER: Record<Modality, string> = {
+  image: "vd: Con vật trong ảnh là gì?",
+  text: "vd: Câu bình luận này mang sắc thái gì?",
+  audio: "vd: Người nói trong đoạn này nói gì?",
+  video: "vd: Trong video có những phương tiện nào?",
+  pair: "vd: Câu trả lời nào đúng và hữu ích hơn?",
+  list: "vd: Xếp các câu trả lời từ tốt nhất tới kém nhất.",
+};
 
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
 const parseClasses = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
@@ -96,7 +108,7 @@ function ToolEditor({ tool, projectName, modality, all, thresholds, onChange, on
           </Select>
         </Field>
         <label className="flex h-8 items-center gap-1.5 text-sm" title="Bật thì labeler phải trả lời câu này mới nộp được bài">
-          <Checkbox checked={tool.required !== false} onCheckedChange={(c) => set({ required: c === true })} /> Bắt buộc
+          <Checkbox checked={tool.required !== false} onCheckedChange={(c) => set({ required: c === true })} /> Bắt buộc <HelpTip k="requiredTool" />
         </label>
         <div className="ml-auto flex gap-1">
           <Button type="button" size="icon-sm" variant="ghost" onClick={() => onMove(-1)} aria-label="Lên">
@@ -113,6 +125,21 @@ function ToolEditor({ tool, projectName, modality, all, thresholds, onChange, on
       <p className="text-xs text-muted-foreground">
         {TOOL_GUIDE[tool.kind].what} <span className="italic">Ví dụ: {TOOL_GUIDE[tool.kind].example}</span>
       </p>
+      <Field
+        label={
+          <span className="inline-flex items-center gap-1">
+            Dòng nhắc cho công cụ (tuỳ chọn) <HelpTip k="toolHint" />
+          </span>
+        }
+      >
+        <Input
+          className="h-8"
+          maxLength={300}
+          value={tool.hint ?? ""}
+          placeholder="vd: Khoanh sát mép, kể cả phần bị che khuất"
+          onChange={(e) => set({ hint: e.target.value || undefined })}
+        />
+      </Field>
       {hasClasses && (
         <Field
           label="Các lớp"
@@ -163,7 +190,13 @@ function ToolEditor({ tool, projectName, modality, all, thresholds, onChange, on
           </Field>
         )}
         {!["classification", "pairwise", "freeText", "number"].includes(tool.kind) && (
-          <Field label="Ngưỡng khớp (0–1)" hint={`Giống tới mức nào thì tính là giống đa số. ${TOOL_GUIDE[tool.kind].grading}`} className="w-72">
+          <Field
+            label={
+              <span className="inline-flex items-center gap-1">
+                Ngưỡng khớp (0–1) <HelpTip k="matchThreshold" />
+              </span>
+            }
+            hint={`Giống tới mức nào thì tính là giống đa số. ${TOOL_GUIDE[tool.kind].grading}`} className="w-72">
             {/* Chưa đặt riêng thì hiện ngưỡng của nền tảng cho loại công cụ này (không lưu cứng — admin đổi thì theo). */}
             <Input className="h-8" type="number" step="0.05" min={0} max={1} value={tool.matchThreshold ?? thresholds[tool.kind] ?? ""} onChange={(e) => set({ matchThreshold: numOrNull(e.target.value) })} />
           </Field>
@@ -254,32 +287,62 @@ export function SchemaEditor({
       </div>
     );
 
+  const question = value.question ?? "";
+
   return (
     <div className="space-y-3">
+      <div data-tour="cfg-cau-hoi" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+        <Field
+          label={
+            <span className="inline-flex items-center gap-1">
+              Câu hỏi chung <HelpTip k="question" />
+            </span>
+          }
+          required
+          hint="Bắt buộc trước khi publish. Mẫu cần hỏi khác thì đặt câu hỏi riêng cho mẫu đó ở tab Dữ liệu."
+        >
+          <Textarea
+            rows={2}
+            maxLength={1000}
+            value={question}
+            placeholder={QUESTION_PLACEHOLDER[modality]}
+            onChange={(e) => onChange({ ...value, question: e.target.value || undefined })}
+          />
+        </Field>
+        {question.trim() && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Labeler thấy ở đầu mỗi câu:</p>
+            <QuestionBanner text={question.trim()} className="bg-background" />
+          </div>
+        )}
+      </div>
       {(modality === "audio" || modality === "video") && (
         <Field label="Cắt file dài thành đoạn (giây)" hint="5–3600. Mỗi đoạn là một câu riêng (vd file 5 phút, cắt 30 giây → 10 câu). Bỏ trống = mỗi file một câu." className="max-w-md">
           <Input type="number" value={value.segmentSeconds ?? ""} onChange={(e) => onChange({ ...value, segmentSeconds: numOrNull(e.target.value) })} />
         </Field>
       )}
-      {tools.map((t, i) => (
-        <ToolEditor
-          key={i}
-          tool={t}
-          projectName={projectName}
-          thresholds={thresholds}
-          modality={modality}
-          all={tools}
-          onChange={(nt) => setTools(tools.map((x, k) => (k === i ? nt : x)))}
-          onRemove={() => setTools(tools.filter((_, k) => k !== i))}
-          onMove={(d) => {
-            const j = i + d;
-            if (j < 0 || j >= tools.length) return;
-            const next = tools.slice();
-            [next[i], next[j]] = [next[j], next[i]];
-            setTools(next);
-          }}
-        />
-      ))}
+      <div data-tour="cfg-cong-cu" className="space-y-3">
+        {tools.length === 0 && <p className="text-sm text-muted-foreground">Chưa có công cụ nào — bấm “Thêm công cụ”.</p>}
+        {tools.map((t, i) => (
+          <ToolEditor
+            key={i}
+            tool={t}
+            projectName={projectName}
+            thresholds={thresholds}
+            modality={modality}
+            all={tools}
+            onChange={(nt) => setTools(tools.map((x, k) => (k === i ? nt : x)))}
+            onRemove={() => setTools(tools.filter((_, k) => k !== i))}
+            onMove={(d) => {
+              const j = i + d;
+              if (j < 0 || j >= tools.length) return;
+              const next = tools.slice();
+              [next[i], next[j]] = [next[j], next[i]];
+              setTools(next);
+            }}
+          />
+        ))}
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"

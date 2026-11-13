@@ -39,12 +39,8 @@ export default function NewProjectPage() {
     setBusy(true);
     try {
       const p = await post<Project>("/projects", { name: name.trim(), description: desc.trim(), modality: tpl?.modality ?? modality, visibility: vis });
-      // Tạo từ mẫu: chép tập nhãn + hướng dẫn sang dự án, không tham chiếu mẫu (mục 17.10).
-      // Mẫu dự án: tập nhãn + hướng dẫn trong MỘT lần PATCH (tập nhãn được áp trước hướng dẫn).
-      const nhom: Record<string, unknown> = {};
-      if (tpl?.labelSchema) nhom.labelSchema = { ...tpl.labelSchema, modality: tpl.modality };
-      if (tpl?.guidelineMarkdown) nhom.guideline = { markdown: tpl.guidelineMarkdown, examples: [] };
-      if (Object.keys(nhom).length > 0) await patch(`/projects/${p.id}`, nhom);
+      // Tạo từ mẫu: chép tập nhãn (kèm câu hỏi chung + dòng nhắc công cụ) sang dự án, không tham chiếu mẫu.
+      if (tpl?.labelSchema) await patch(`/projects/${p.id}`, { labelSchema: { ...tpl.labelSchema, modality: tpl.modality } });
       toast.success("Đã tạo dự án");
       router.push(`/du-an/${p.id}?tab=cau-hinh`);
     } catch (e) {

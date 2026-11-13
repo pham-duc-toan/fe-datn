@@ -76,7 +76,7 @@ export function PublishChecklist({ project: p }: { project: Project }) {
 
   const missing = r?.missing.length ?? 0;
   return (
-    <div className="flex h-full flex-col gap-2 rounded-lg border bg-card p-3 text-sm shadow-xs">
+    <div data-tour="cfg-checklist" className="flex h-full flex-col gap-2 rounded-lg border bg-card p-3 text-sm shadow-xs">
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold">Checklist publish</span>
         {r && (missing === 0 && kybOk ? (

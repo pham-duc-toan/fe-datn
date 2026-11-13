@@ -2,21 +2,22 @@ import type { ToolKind } from "@/lib/types";
 
 /**
  * Tiến độ hướng dẫn của người dùng trên trình duyệt này (như "đã qua màn hướng dẫn" trong game):
- *   - learned : loại công cụ đã luyện (hoặc đã bỏ qua) — dự án sau chỉ dạy công cụ MỚI;
- *   - tourDone: đã xem (hoặc bỏ qua) tour giới thiệu trang làm bài.
+ *   - learned       : loại công cụ đã luyện (hoặc đã bỏ qua) — dự án sau chỉ dạy công cụ MỚI;
+ *   - tourDone      : đã xem (hoặc bỏ qua) tour giới thiệu trang làm bài;
+ *   - creatorTourDone: người tạo dự án đã xem (hoặc bỏ qua) tour trang cấu hình dự án.
  * Không có gì bắt buộc: localStorage bị chặn thì coi như chưa học, hướng dẫn hiện lại (vẫn bỏ qua được).
  */
 const KEY = "crowd:huong-dan:v1";
 
-type TutorialState = { learned: ToolKind[]; tourDone: boolean };
+type TutorialState = { learned: ToolKind[]; tourDone: boolean; creatorTourDone: boolean };
 
 export function readTutorial(): TutorialState {
   try {
     const raw = localStorage.getItem(KEY);
     const v = raw ? (JSON.parse(raw) as Partial<TutorialState>) : {};
-    return { learned: Array.isArray(v.learned) ? v.learned : [], tourDone: v.tourDone === true };
+    return { learned: Array.isArray(v.learned) ? v.learned : [], tourDone: v.tourDone === true, creatorTourDone: v.creatorTourDone === true };
   } catch {
-    return { learned: [], tourDone: false };
+    return { learned: [], tourDone: false, creatorTourDone: false };
   }
 }
 
@@ -35,6 +36,10 @@ export function markLearned(kinds: ToolKind[]) {
 
 export function markTourDone() {
   write({ ...readTutorial(), tourDone: true });
+}
+
+export function markCreatorTourDone() {
+  write({ ...readTutorial(), creatorTourDone: true });
 }
 
 /** Loại công cụ của dự án mà người dùng chưa luyện. */

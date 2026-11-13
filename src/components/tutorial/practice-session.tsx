@@ -128,6 +128,7 @@ export function PracticeSession({ schema, only, onDone }: Props) {
           modality={schema.modality}
           fileUrl={demo.fileUrl}
           content={demo.content}
+          question={demo.question}
           metadata={demo.metadata}
           value={data}
           onChange={setData}

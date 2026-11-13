@@ -1,28 +1,40 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Save, Trash2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, GraduationCap, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
-import { Field, Markdown } from "@/components/common/misc";
+import { Field } from "@/components/common/misc";
+import { SpotlightTour } from "@/components/tutorial/spotlight-tour";
+import { markCreatorTourDone, readTutorial } from "@/components/tutorial/tutorial-store";
 import { TagPicker } from "@/components/common/tag-picker";
 import { api, patch } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatVnd } from "@/lib/format";
 import { TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
-import type { Guideline, LabelSchema, Project, Readiness, ToolKind, Visibility } from "@/lib/types";
+import type { LabelSchema, Project, Readiness, ToolKind, Visibility } from "@/lib/types";
+import { CREATOR_TOUR } from "./creator-tour";
+import { LabelerPreview } from "./labeler-preview";
+import { HelpTip, type ParamKey } from "./param-help";
 import { SchemaEditor } from "./schema-editor";
 import { useSetProject } from "./use-project";
+
+/** Nhãn của một ô kèm biểu tượng ⓘ (tác dụng + chỗ labeler thấy). */
+function L({ children, k }: { children: ReactNode; k: ParamKey }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {children} <HelpTip k={k} />
+    </span>
+  );
+}
 
 /** Công cụ dùng được trên cổng link — mặc định của setting gate.allowed_tools (mục 17.5). */
 const GATE_TOOLS = ["classification", "pairwise", "number", "bbox", "keypoint", "span"];
@@ -50,10 +62,10 @@ function toLocal(iso: string | null): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function SaveCard({ title, description, children, onSave, disabled, note }: { title: string; description?: ReactNode; children: ReactNode; onSave: () => Promise<unknown>; disabled?: boolean; note?: ReactNode }) {
+function SaveCard({ title, description, children, onSave, disabled, note, tour }: { title: ReactNode; description?: ReactNode; children: ReactNode; onSave: () => Promise<unknown>; disabled?: boolean; note?: ReactNode; tour?: string }) {
   const [busy, setBusy] = useState(false);
   return (
-    <Card>
+    <Card data-tour={tour}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
@@ -82,7 +94,7 @@ function SaveCard({ title, description, children, onSave, disabled, note }: { ti
   );
 }
 
-type ProjectPatchGroup = "info" | "labelSchema" | "guideline" | "pricing" | "channels" | "eligibility" | "protection" | "tags" | "retention";
+type ProjectPatchGroup = "info" | "labelSchema" | "pricing" | "channels" | "eligibility" | "protection" | "tags" | "retention";
 
 export function ConfigTab({ project: p }: { project: Project }) {
   const setProject = useSetProject(p.id);
@@ -99,7 +111,14 @@ export function ConfigTab({ project: p }: { project: Project }) {
   const [desc, setDesc] = useState(p.description);
   const [vis, setVis] = useState<Visibility>(p.visibility);
   const [schema, setSchema] = useState<LabelSchema>(p.labelSchema ?? { modality: p.modality, tools: [] });
-  const [guide, setGuide] = useState<Guideline>(p.guideline ?? { markdown: "", examples: [] });
+  // Tour kiểu game cho người tạo dự án: tự mở lần đầu (dự án nháp), xem lại bằng nút "Xem lại hướng dẫn".
+  const [tour, setTour] = useState(false);
+  useEffect(() => {
+    if (!draft || readTutorial().creatorTourDone) return;
+    // Mở sau khi trang dựng xong (tour đo vị trí các vùng data-tour).
+    const h = setTimeout(() => setTour(true), 300);
+    return () => clearTimeout(h);
+  }, [draft]);
   // Giới hạn x, y (ngưỡng đạt), số suất, thưởng tối thiểu, % phí — admin đặt trong setting, đọc qua checklist.
   const rdy = useQuery({ queryKey: ["readiness", p.id], queryFn: () => api<Readiness>(`/projects/${p.id}/readiness`) });
   const lim = rdy.data?.limits;
@@ -133,20 +152,57 @@ export function ConfigTab({ project: p }: { project: Project }) {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <LabelerPreview
+          project={p}
+          draft={{
+            name,
+            description: desc,
+            visibility: vis,
+            schema: { ...schema, modality: p.modality },
+            rewardVnd: reward,
+            slots,
+            passThresholdPercent: t,
+            deadline: price.deadline ? new Date(price.deadline).toISOString() : null,
+            allowProfessional: ch.allowProfessional,
+            requireEntranceTest: el.requireEntranceTest,
+            sensitiveContent: prot.sensitiveContent,
+            requireVerifiedIdentity: prot.requireVerifiedIdentity,
+            ndaRequired: prot.ndaRequired,
+            domains: tags.domains,
+            languages: tags.languages,
+            escrowVnd: slots * (reward + feePerPass) + gateBudget,
+          }}
+        />
+        <Button type="button" variant="ghost" onClick={() => setTour(true)} title="Xem lại tour giới thiệu trang cấu hình">
+          <GraduationCap /> Xem lại hướng dẫn
+        </Button>
+        <span className="text-xs text-muted-foreground">Bấm biểu tượng ⓘ cạnh mỗi ô để xem nó làm gì với dự án và labeler thấy ở đâu.</span>
+      </div>
+      {tour && (
+        <SpotlightTour
+          steps={CREATOR_TOUR}
+          finishLabel="Bắt đầu cấu hình"
+          onClose={() => {
+            markCreatorTourDone();
+            setTour(false);
+          }}
+        />
+      )}
       {!draft && (
         <Alert>
           <AlertTriangle />
           <AlertDescription>Dự án đã publish: tập nhãn, tiền thưởng, số suất, ngưỡng đạt, dữ liệu, câu vàng, điều kiện không sửa được nữa.</AlertDescription>
         </Alert>
       )}
-      <SaveCard title="Thông tin dự án" onSave={() => save("info", { name, description: desc, visibility: vis })}>
-        <Field label="Tên">
+      <SaveCard title="Thông tin dự án" tour="cfg-thong-tin" onSave={() => save("info", { name, description: desc, visibility: vis })}>
+        <Field label={<L k="name">Tên</L>}>
           <Input value={name} maxLength={200} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="Mô tả">
+        <Field label={<L k="description">Mô tả</L>}>
           <Textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} />
         </Field>
-        <Field label="Chế độ tham gia" hint={draft ? undefined : "Chỉ đổi được khi còn nháp"}>
+        <Field label={<L k="visibility">Chế độ tham gia</L>} hint={draft ? undefined : "Chỉ đổi được khi còn nháp"}>
           <RadioGroup value={vis} onValueChange={(v) => setVis(v as Visibility)} className="flex flex-wrap gap-3" disabled={!draft}>
             {(Object.keys(VISIBILITY_LABEL) as Visibility[]).map((v) => (
               <label key={v} className="flex items-center gap-2 text-sm">
@@ -157,47 +213,18 @@ export function ConfigTab({ project: p }: { project: Project }) {
         </Field>
       </SaveCard>
 
-      <SaveCard title="Tập nhãn" onSave={() => save("labelSchema", { ...schema, modality: p.modality })} disabled={!draft}>
+      <SaveCard
+        title="Câu hỏi và công cụ gán nhãn"
+        description="Câu hỏi chung cho labeler biết phải trả lời gì về mỗi mẫu; công cụ là cách trả lời. Labeler học từng loại công cụ ở màn luyện tập trước khi làm bài — không cần viết hướng dẫn riêng."
+        onSave={() => save("labelSchema", { ...schema, modality: p.modality })}
+        disabled={!draft}
+      >
         <SchemaEditor modality={p.modality} value={schema} onChange={setSchema} projectName={name} thresholds={lim?.matchThresholds} />
-      </SaveCard>
-
-      <SaveCard title="Hướng dẫn gán nhãn" description="Markdown; hiển thị cho labeler trước khi làm. Ví dụ đúng / sai giúp labeler hiểu nhanh." onSave={() => save("guideline", guide)} disabled={!draft}>
-        <Tabs defaultValue="sua">
-          <TabsList>
-            <TabsTrigger value="sua">Soạn</TabsTrigger>
-            <TabsTrigger value="xem">Xem trước</TabsTrigger>
-          </TabsList>
-          <TabsContent value="sua">
-            <Textarea rows={10} className="font-mono text-sm" value={guide.markdown} onChange={(e) => setGuide({ ...guide, markdown: e.target.value })} placeholder="# Hướng dẫn&#10;- Chọn lớp đúng nhất cho ảnh…" />
-          </TabsContent>
-          <TabsContent value="xem">
-            <div className="min-h-32 rounded-md border p-3">{guide.markdown ? <Markdown>{guide.markdown}</Markdown> : <p className="text-sm text-muted-foreground">Chưa có nội dung.</p>}</div>
-          </TabsContent>
-        </Tabs>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Ví dụ minh hoạ</span>
-            <Button type="button" size="xs" variant="outline" onClick={() => setGuide({ ...guide, examples: guide.examples.concat([{ sampleId: null, label: "", isCorrect: true, explanation: "" }]) })}>
-              <Plus /> Thêm ví dụ
-            </Button>
-          </div>
-          {guide.examples.map((ex, i) => (
-            <div key={i} className="grid gap-2 rounded-md border p-2 sm:grid-cols-[1fr_auto_auto]">
-              <Input placeholder="Nhãn (vd: ô tô)" value={ex.label ?? ""} onChange={(e) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)) })} />
-              <label className="flex items-center gap-1.5 text-sm">
-                <Checkbox checked={ex.isCorrect} onCheckedChange={(c) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, isCorrect: c === true } : x)) })} /> Đúng
-              </label>
-              <Button type="button" size="icon-sm" variant="ghost" onClick={() => setGuide({ ...guide, examples: guide.examples.filter((_, k) => k !== i) })}>
-                <Trash2 />
-              </Button>
-              <Input className="sm:col-span-3" placeholder="Giải thích" value={ex.explanation ?? ""} onChange={(e) => setGuide({ ...guide, examples: guide.examples.map((x, k) => (k === i ? { ...x, explanation: e.target.value } : x)) })} />
-            </div>
-          ))}
-        </div>
       </SaveCard>
 
       <SaveCard
         title="Tiền thưởng, số suất, ngưỡng đạt"
+        tour="cfg-gia"
         description="Tiền tính cho CẢ DỰ ÁN: mỗi labeler làm hết các câu rồi nộp một bài. Bài đạt = giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra. Mỗi suất thưởng trao cho một bài đạt, theo thứ tự nộp sớm nhất; số người được làm nhiều hơn số suất để đa số chắc hơn."
         disabled={!draft}
         onSave={() =>
@@ -222,11 +249,11 @@ export function ConfigTab({ project: p }: { project: Project }) {
         }
       >
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Tiền thưởng mỗi suất (đ)" hint={lim ? `Tối thiểu ${formatVnd(lim.minRewardVnd)} — cho cả bài, không theo câu` : "Cho cả bài, không theo câu"}>
+          <Field label={<L k="reward">Tiền thưởng mỗi suất (đ)</L>} hint={lim ? `Tối thiểu ${formatVnd(lim.minRewardVnd)} — cho cả bài, không theo câu` : "Cho cả bài, không theo câu"}>
             <Input type="number" min={0} value={price.rewardVnd} onChange={(e) => setPrice({ ...price, rewardVnd: e.target.value })} />
           </Field>
           <Field
-            label="Số suất thưởng"
+            label={<L k="slots">Số suất thưởng</L>}
             hint={
               lim
                 ? `${lim.minSlots}–${lim.maxSlots} người được thưởng (n bài đạt nộp sớm nhất). Tối đa ${slots ? slots * lim.participantMultiplier : `n × ${lim.participantMultiplier}`} người được làm bài.`
@@ -235,11 +262,11 @@ export function ConfigTab({ project: p }: { project: Project }) {
           >
             <Input type="number" min={lim?.minSlots ?? 1} max={lim?.maxSlots ?? 50} value={price.slots} onChange={(e) => setPrice({ ...price, slots: e.target.value })} />
           </Field>
-          <Field label="Hạn chót">
+          <Field label={<L k="deadline">Hạn chót</L>}>
             <Input type="datetime-local" value={price.deadline} onChange={(e) => setPrice({ ...price, deadline: e.target.value })} />
           </Field>
         </div>
-        <Field label={`Ngưỡng đạt t = ${t}%`} hint={`Tỉ lệ câu của bài giống đa số tối thiểu để được thưởng. Quản trị viên cho phép trong khoảng ${tMin}%–${tMax}%.`}>
+        <Field label={<L k="passThreshold">{`Ngưỡng đạt t = ${t}%`}</L>} hint={`Tỉ lệ câu của bài giống đa số tối thiểu để được thưởng. Quản trị viên cho phép trong khoảng ${tMin}%–${tMax}%.`}>
           <Slider
             min={tMin}
             max={tMax}
@@ -252,7 +279,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         </Field>
         <div className="space-y-3 rounded-md border p-3">
           <label className="flex items-center gap-2 text-sm font-medium">
-            <Switch checked={price.fill} onCheckedChange={(v) => setPrice({ ...price, fill: v })} disabled={!draft} /> Lấp suất còn trống
+            <Switch checked={price.fill} onCheckedChange={(v) => setPrice({ ...price, fill: v })} disabled={!draft} /> Lấp suất còn trống <HelpTip k="fillSlots" />
           </label>
           <p className="text-xs text-muted-foreground">
             Khi số bài đạt ít hơn số suất, các suất còn lại được trao cho những bài giống đa số nhiều nhất (cùng tỉ lệ thì bài nộp sớm hơn được trước). Bài vẫn phải đúng hết câu kiểm tra.
@@ -267,6 +294,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
 
       <SaveCard
         title="Kênh thu thập"
+        tour="cfg-kenh"
         disabled={!draft}
         onSave={() =>
           save("channels", {
@@ -292,21 +320,21 @@ export function ConfigTab({ project: p }: { project: Project }) {
             <Field label="Đơn giá mỗi nhãn khách vãng lai" hint="Do hệ thống quy định, doanh nghiệp không đổi được. Chốt vào dự án lúc publish.">
               <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium tabular-nums">{formatVnd(gateUnit)} / nhãn</div>
             </Field>
-            <Field label="Ngân sách cổng link (đ)" hint="Cộng vào ký quỹ">
+            <Field label={<L k="gateBudget">Ngân sách cổng link (đ)</L>} hint="Cộng vào ký quỹ">
               <Input type="number" min={0} value={gate.budget} onChange={(e) => setGate({ ...gate, budget: e.target.value })} />
             </Field>
           </div>
         )}
         {(
           [
-            ["allowProfessional", "Kênh chuyên nghiệp", "Labeler trong chợ dự án làm bài (cả dự án)"],
-            ["allowLinkGateway", "Cổng vượt link", "Khách vãng lai giải 1–3 câu khi mở link rút gọn"],
-            ["allowCollaborative", "Gán nhãn cộng tác", "Nhiều người cùng làm (chưa mở ở bản này)"],
+            ["allowProfessional", "Kênh chuyên nghiệp", "Labeler trong chợ dự án làm bài (cả dự án)", "professional"],
+            ["allowLinkGateway", "Cổng vượt link", "Khách vãng lai giải 1–3 câu khi mở link rút gọn", "linkGateway"],
+            ["allowCollaborative", "Gán nhãn cộng tác", "Nhiều người cùng làm (chưa mở ở bản này)", null],
           ] as const
-        ).map(([k, label, hint]) => (
+        ).map(([k, label, hint, help]) => (
           <label key={k} className="flex items-center justify-between gap-3 rounded-md border p-3">
             <span>
-              <span className="text-sm font-medium">{label}</span>
+              <span className="text-sm font-medium">{label}</span> {help && <HelpTip k={help} />}
               <span className="block text-xs text-muted-foreground">{hint}</span>
             </span>
             <Switch checked={ch[k]} onCheckedChange={(v) => setCh({ ...ch, [k]: v })} />
@@ -316,6 +344,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
 
       <SaveCard
         title="Điều kiện tham gia"
+        tour="cfg-dieu-kien"
         disabled={!draft}
         onSave={() =>
           save("eligibility", {
@@ -328,15 +357,15 @@ export function ConfigTab({ project: p }: { project: Project }) {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Cấp độ tối thiểu" hint="Trống = không yêu cầu">
+          <Field label={<L k="minLevel">Cấp độ tối thiểu</L>} hint="Trống = không yêu cầu">
             <Input type="number" min={1} max={5} value={el.minLevel} onChange={(e) => setEl({ ...el, minLevel: e.target.value })} />
           </Field>
-          <Field label="Uy tín tối thiểu (0–100)">
+          <Field label={<L k="minReputation">Uy tín tối thiểu (0–100)</L>}>
             <Input type="number" min={0} max={100} value={el.minReputation} onChange={(e) => setEl({ ...el, minReputation: e.target.value })} />
           </Field>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <Switch checked={el.requireEntranceTest} onCheckedChange={(v) => setEl({ ...el, requireEntranceTest: v })} /> Yêu cầu bài test đầu vào (cần câu vàng mục đích “bài test”)
+          <Switch checked={el.requireEntranceTest} onCheckedChange={(v) => setEl({ ...el, requireEntranceTest: v })} /> Yêu cầu bài test đầu vào (cần câu vàng mục đích “bài test”) <HelpTip k="entranceTest" />
         </label>
         {el.requireEntranceTest && (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -352,6 +381,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
 
       <SaveCard
         title="Bảo vệ nội dung & NDA"
+        tour="cfg-bao-ve"
         description="Dự án nhạy cảm chỉ nhận người đã xác minh danh tính và đủ tuổi, phải đồng ý cảnh báo trước; mẫu được che cho tới khi bấm hiện."
         disabled={!draft}
         onSave={async () => {
@@ -361,7 +391,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
         }}
       >
         <label className="flex items-center gap-2 text-sm">
-          <Switch checked={prot.sensitiveContent} onCheckedChange={(v) => setProt({ ...prot, sensitiveContent: v, contentWarning: v && !prot.contentWarning.trim() ? DEFAULT_CONTENT_WARNING : prot.contentWarning })} /> Nội dung nhạy cảm
+          <Switch checked={prot.sensitiveContent} onCheckedChange={(v) => setProt({ ...prot, sensitiveContent: v, contentWarning: v && !prot.contentWarning.trim() ? DEFAULT_CONTENT_WARNING : prot.contentWarning })} /> Nội dung nhạy cảm <HelpTip k="sensitive" />
         </label>
         {prot.sensitiveContent && (
           <Field label="Cảnh báo nội dung">
@@ -369,7 +399,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
           </Field>
         )}
         <label className="flex items-center gap-2 text-sm">
-          <Switch checked={prot.ndaRequired} onCheckedChange={(v) => setProt({ ...prot, ndaRequired: v, ndaText: v && !prot.ndaText.trim() ? defaultNda(name) : prot.ndaText })} /> Yêu cầu ký thoả thuận bảo mật (NDA)
+          <Switch checked={prot.ndaRequired} onCheckedChange={(v) => setProt({ ...prot, ndaRequired: v, ndaText: v && !prot.ndaText.trim() ? defaultNda(name) : prot.ndaText })} /> Yêu cầu ký thoả thuận bảo mật (NDA) <HelpTip k="nda" />
         </label>
         {prot.ndaRequired && (
           <Field label="Văn bản NDA" hint={p.ndaVersion ? `Phiên bản hiện tại: ${p.ndaVersion}. Nhập lại văn bản để lưu.` : "Labeler phải đọc và đồng ý trước khi vào dự án."}>
@@ -377,13 +407,13 @@ export function ConfigTab({ project: p }: { project: Project }) {
           </Field>
         )}
         <label className="flex items-center gap-2 text-sm">
-          <Switch checked={prot.requireVerifiedIdentity} onCheckedChange={(v) => setProt({ ...prot, requireVerifiedIdentity: v })} /> Chỉ nhận người đã xác minh danh tính
+          <Switch checked={prot.requireVerifiedIdentity} onCheckedChange={(v) => setProt({ ...prot, requireVerifiedIdentity: v })} /> Chỉ nhận người đã xác minh danh tính <HelpTip k="verifiedIdentity" />
         </label>
       </SaveCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SaveCard
-          title="Chủ đề (để gợi ý labeler)"
+          title={<L k="tags">Chủ đề (để gợi ý labeler)</L>}
           description="Labeler có thẻ trùng với dự án sẽ thấy dự án trong mục gợi ý."
           onSave={() => save("tags", { domains: tags.domains, languages: tags.languages })}
         >
@@ -394,7 +424,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
             <TagPicker kind="language" value={tags.languages} onChange={(v) => setTags({ ...tags, languages: v })} />
           </Field>
         </SaveCard>
-        <SaveCard title="Lưu trữ file" description="Đồng ý để hệ thống xoá file gốc khi dự án đóng quá hạn giữ." onSave={() => save("retention", { deleteFilesAfterClose: retention })}>
+        <SaveCard title={<L k="retention">Lưu trữ file</L>} description="Đồng ý để hệ thống xoá file gốc khi dự án đóng quá hạn giữ." onSave={() => save("retention", { deleteFilesAfterClose: retention })}>
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={retention} onCheckedChange={setRetention} /> Xoá file gốc sau khi đóng
           </label>

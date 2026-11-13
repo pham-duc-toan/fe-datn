@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/page-header";
@@ -21,9 +20,9 @@ import { formatDateTime, formatVnd } from "@/lib/format";
 import { MODALITY_LABEL, TOOL_LABEL } from "@/lib/labels";
 import type { LabelSchema, Modality, Template } from "@/lib/types";
 
-type Form = { id: string | null; code: string; name: string; description: string; modality: Modality; schema: LabelSchema; guideline: string; price: string; redundancy: string };
+type Form = { id: string | null; code: string; name: string; description: string; modality: Modality; schema: LabelSchema; price: string; redundancy: string };
 
-const empty = (): Form => ({ id: null, code: "", name: "", description: "", modality: "image", schema: { modality: "image", tools: [] }, guideline: "", price: "", redundancy: "" });
+const empty = (): Form => ({ id: null, code: "", name: "", description: "", modality: "image", schema: { modality: "image", tools: [] }, price: "", redundancy: "" });
 
 export default function TemplatesAdminPage() {
   const qc = useQueryClient();
@@ -40,7 +39,6 @@ export default function TemplatesAdminPage() {
         name: form.name,
         description: form.description,
         labelSchema: { ...form.schema, modality: form.modality },
-        guidelineMarkdown: form.guideline,
         suggestedUnitPriceVnd: form.price ? Number(form.price) : null,
         suggestedRedundancy: form.redundancy ? Number(form.redundancy) : null,
       };
@@ -106,9 +104,6 @@ export default function TemplatesAdminPage() {
               </Field>
             </div>
             <SchemaEditor modality={form.modality} value={form.schema} onChange={(s) => setForm({ ...form, schema: s })} projectName={form.name} />
-            <Field label="Hướng dẫn (markdown)">
-              <Textarea rows={6} className="font-mono text-sm" value={form.guideline} onChange={(e) => setForm({ ...form, guideline: e.target.value })} />
-            </Field>
             <div className="flex gap-2">
               <Button onClick={() => void save()} disabled={busy || !form.code || !form.name}>
                 {busy && <Loader2 className="animate-spin" />} Lưu
@@ -163,7 +158,6 @@ export default function TemplatesAdminPage() {
                                 description: t.description,
                                 modality: t.modality,
                                 schema: { ...(t.labelSchema ?? { tools: [] }), modality: t.modality } as LabelSchema,
-                                guideline: t.guidelineMarkdown,
                                 price: t.suggestedUnitPriceVnd?.toString() ?? "",
                                 redundancy: t.suggestedRedundancy?.toString() ?? "",
                               })

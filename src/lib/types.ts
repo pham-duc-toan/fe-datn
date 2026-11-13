@@ -65,9 +65,15 @@ export type Tool = {
   integer?: boolean;
   tolerance?: number;
   rotatable?: boolean;
+  /** Dòng nhắc riêng của công cụ, hiện ngay dưới tên công cụ (vd "Khoanh sát mép"). */
+  hint?: string;
 };
 
-export type LabelSchema = { modality: Modality; segmentSeconds?: number | null; tools: Tool[] };
+/**
+ * Tập nhãn. `question` = câu hỏi CHUNG labeler thấy ở đầu mỗi câu (bắt buộc trước khi publish); mẫu có câu riêng
+ * (`Sample.question`) thì hiện câu riêng thay thế. Hướng dẫn Markdown của dự án đã bỏ.
+ */
+export type LabelSchema = { modality: Modality; segmentSeconds?: number | null; question?: string; tools: Tool[] };
 
 /** Dữ liệu nhãn: khoá = tên công cụ. */
 export type LabelData = Record<string, unknown>;
@@ -85,17 +91,13 @@ export type SampleMeta = {
   fps?: number;
 };
 
-export type SampleContent = { text?: string; prompt?: string; a?: string; b?: string; items?: string[] };
+/** Nội dung mẫu không phải file. Câu hỏi KHÔNG nằm ở đây mà ở `question` của mẫu / tập nhãn. */
+export type SampleContent = { text?: string; a?: string; b?: string; items?: string[] };
 
 /* ---------- Dự án ---------- */
 
 export type ProjectStatus = "draft" | "pendingEscrow" | "pendingApproval" | "running" | "paused" | "grading" | "completed" | "cancelled";
 export type Visibility = "public" | "approval" | "private";
-
-export type Guideline = {
-  markdown: string;
-  examples: { sampleId: string | null; label: string | null; isCorrect: boolean; explanation: string | null }[];
-};
 
 export type Project = {
   id: string;
@@ -105,7 +107,6 @@ export type Project = {
   status: ProjectStatus;
   visibility: Visibility;
   labelSchema: LabelSchema | null;
-  guideline: Guideline | null;
   /** Tiền thưởng cho MỘT bài đạt (dự án làm trung tâm — không tính theo nhãn). */
   rewardVnd: number;
   /** Số suất: tối đa bao nhiêu bài đạt được thưởng. */
@@ -236,6 +237,8 @@ export type Sample = {
   sizeBytes: number | null;
   fileUrl: string | null;
   content: SampleContent | null;
+  /** Câu hỏi RIÊNG của mẫu. null = labeler thấy câu hỏi chung của dự án. */
+  question: string | null;
   metadata: SampleMeta;
   ingestState: IngestState;
   /** Lý do khi ingestState = failed. */
@@ -316,6 +319,8 @@ export type AttemptQuestion = {
   modality: Modality;
   fileUrl: string | null;
   content: SampleContent | null;
+  /** Câu hỏi labeler thấy ở câu này (đã gộp: câu riêng, không có thì câu chung). */
+  question: string | null;
   metadata: SampleMeta;
   answer: LabelData | null;
   answeredAt: string | null;
@@ -411,6 +416,8 @@ export type Annotation = {
   source: "professional" | "linkGateway";
   fileUrl: string | null;
   sampleContent: SampleContent | null;
+  /** Câu hỏi của mẫu (câu riêng, không có thì câu hỏi chung). */
+  sampleQuestion: string | null;
   sampleMetadata: SampleMeta;
   labelerId: string | null;
   payload: LabelPayload;
@@ -550,7 +557,6 @@ export type Template = {
   description: string;
   modality: Modality;
   labelSchema: LabelSchema | null;
-  guidelineMarkdown: string;
   suggestedUnitPriceVnd: number | null;
   suggestedRedundancy: number | null;
   active: boolean;

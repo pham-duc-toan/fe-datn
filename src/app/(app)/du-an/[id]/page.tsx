@@ -86,7 +86,7 @@ export default function ProjectDetailPage() {
         </p>
       ) : (
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="h-auto flex-wrap">
+          <TabsList className="h-auto flex-wrap" data-tour="du-an-tabs">
             {tabs.map(([k, label]) => (
               <TabsTrigger key={k} value={k}>
                 {label}

@@ -219,6 +219,7 @@ export default function AttemptPage() {
                 modality={q.modality}
                 fileUrl={q.fileUrl}
                 content={q.content}
+                question={q.question}
                 metadata={q.metadata}
                 value={initialData(a.labelSchema, q.answer)}
                 readOnly

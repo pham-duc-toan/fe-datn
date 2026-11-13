@@ -53,12 +53,12 @@ function AttemptReview({ a }: { a: AttemptSummary }) {
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Labeler chọn</p>
-                <Workspace schema={schema} modality={p.data!.modality} fileUrl={l.fileUrl} content={l.sampleContent} metadata={l.sampleMetadata} value={l.payload.data} readOnly seed={l.sampleId} stacked />
+                <Workspace schema={schema} modality={p.data!.modality} fileUrl={l.fileUrl} content={l.sampleContent} question={l.sampleQuestion} metadata={l.sampleMetadata} value={l.payload.data} readOnly seed={l.sampleId} stacked />
               </div>
               <div>
                 <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Kết quả gộp (đa số các bài đạt)</p>
                 {f?.consensusFinal ? (
-                  <Workspace schema={schema} modality={p.data!.modality} fileUrl={l.fileUrl} content={l.sampleContent} metadata={l.sampleMetadata} value={f.consensusFinal} readOnly seed={l.sampleId} stacked />
+                  <Workspace schema={schema} modality={p.data!.modality} fileUrl={l.fileUrl} content={l.sampleContent} question={l.sampleQuestion} metadata={l.sampleMetadata} value={f.consensusFinal} readOnly seed={l.sampleId} stacked />
                 ) : (
                   <p className="text-sm text-muted-foreground">{f?.consensusStatus === "disputed" ? "Không có đa số (hoà phiếu)." : "Chưa có kết quả gộp cho câu này."}</p>
                 )}

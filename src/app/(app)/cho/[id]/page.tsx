@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FreeTextNotice, hasFreeText } from "@/components/project/free-text-notice";
 import { ConsentBox } from "@/components/project/consent-box";
 import { PageHeader } from "@/components/common/page-header";
-import { KeyValue, Markdown } from "@/components/common/misc";
+import { KeyValue } from "@/components/common/misc";
 import { ActionDialog } from "@/components/common/action-dialog";
 import { StatusBadge } from "@/components/common/status-badge";
 import { ErrorState, Loading } from "@/components/common/states";
@@ -95,24 +95,24 @@ export default function LabelerProjectPage() {
               }}
             />
           )}
-          <Card>
-            <CardHeader>
-              <CardTitle>Hướng dẫn</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {p.guideline?.markdown ? <Markdown>{p.guideline.markdown}</Markdown> : <p className="text-sm text-muted-foreground">Chưa có hướng dẫn.</p>}
-              {(p.guideline?.examples ?? []).length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium">Ví dụ</p>
-                  {p.guideline!.examples.map((ex, i) => (
-                    <div key={i} className={`rounded-md border p-2 text-sm ${ex.isCorrect ? "border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/30" : "border-red-200 bg-red-50/50 dark:bg-red-950/30"}`}>
-                      <b>{ex.isCorrect ? "Đúng" : "Sai"}:</b> {ex.label} {ex.explanation && `— ${ex.explanation}`}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {p.labelSchema?.question && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Câu hỏi của dự án</CardTitle>
+                <CardDescription>Mỗi câu trong bài đều hỏi như vậy (vài câu có thể có câu hỏi riêng). Lần đầu gặp công cụ nào, bạn được luyện tập trước khi làm.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm font-medium whitespace-pre-wrap">{p.labelSchema.question}</p>
+                {p.labelSchema.tools.some((t) => t.hint) && (
+                  <ul className="list-disc space-y-0.5 pl-5 text-sm text-muted-foreground">
+                    {p.labelSchema.tools.filter((t) => t.hint).map((t) => (
+                      <li key={t.name}>{t.hint}</li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Bạn sẽ làm gì</CardTitle>

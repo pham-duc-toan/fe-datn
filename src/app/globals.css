@@ -133,14 +133,3 @@
 }
 /* Vùng làm việc gán nhãn: chặn bôi đen ảnh / kéo thả ảnh cho đỡ tiện tay (không chặn được chụp màn hình). */
 .no-drag img { -webkit-user-drag: none; user-select: none; }
-.prose-guideline h1 { font-size: 1.25rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
-.prose-guideline h2 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
-.prose-guideline h3 { font-weight: 600; margin: 0.5rem 0 0.25rem; }
-.prose-guideline p { margin: 0.4rem 0; line-height: 1.6; }
-.prose-guideline ul { list-style: disc; padding-left: 1.25rem; margin: 0.4rem 0; }
-.prose-guideline ol { list-style: decimal; padding-left: 1.25rem; margin: 0.4rem 0; }
-.prose-guideline code { background: var(--muted); padding: 0 0.25rem; border-radius: 0.25rem; font-size: 0.85em; }
-.prose-guideline pre { background: var(--muted); padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; }
-.prose-guideline table { border-collapse: collapse; margin: 0.5rem 0; }
-.prose-guideline th, .prose-guideline td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; }
-.prose-guideline a { color: var(--primary); text-decoration: underline; }

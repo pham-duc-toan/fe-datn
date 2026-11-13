@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
-import { ImageOff } from "lucide-react";
+import { CircleHelp, ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/common/states";
 import type { LabelData, LabelSchema, Modality, SampleContent, SampleMeta, Tool } from "@/lib/types";
@@ -22,6 +22,8 @@ export type WorkspaceProps = {
   fileUrl: string | null;
   content: SampleContent | null;
   metadata: SampleMeta;
+  /** Câu hỏi của câu này (câu riêng của mẫu, không có thì câu hỏi chung của dự án) — hiện nổi bật trên mẫu. */
+  question?: string | null;
   value: LabelData;
   onChange?: (v: LabelData) => void;
   readOnly?: boolean;
@@ -34,7 +36,7 @@ export type WorkspaceProps = {
   highlightTool?: string;
 };
 
-export function Workspace({ schema, modality, fileUrl, content, metadata, value, onChange, readOnly = false, seed, onMediaError, stacked, highlightTool }: WorkspaceProps) {
+export function Workspace({ schema, modality, fileUrl, content, metadata, question, value, onChange, readOnly = false, seed, onMediaError, stacked, highlightTool }: WorkspaceProps) {
   const tools = schema.tools;
   const spatial = tools.filter((t) => isList(t) && t.kind !== "relation");
   const [activeTool, setActiveTool] = useState<string | null>(readOnly ? null : spatial[0]?.name ?? null);
@@ -151,7 +153,6 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, value,
     const right = swapped ? content?.a : content?.b;
     sample = (
       <div className="space-y-3">
-        {content?.prompt && <div className="rounded-md border bg-muted/40 p-3 text-sm whitespace-pre-wrap"><b>Câu hỏi:</b> {content.prompt}</div>}
         <div className="grid gap-3 md:grid-cols-2">
           {[left, right].map((txt, i) => (
             <div key={i} className="rounded-md border bg-card p-3">
@@ -165,7 +166,6 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, value,
   } else if (modality === "list") {
     sample = (
       <div className="space-y-3">
-        {content?.prompt && <div className="rounded-md border bg-muted/40 p-3 text-sm whitespace-pre-wrap"><b>Câu hỏi:</b> {content.prompt}</div>}
         {!tools.some((t) => t.kind === "ranking") && (
           <ol className="list-decimal space-y-1 pl-6 text-sm">
             {seedOrder.map((i) => (
@@ -249,23 +249,40 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, value,
           </div>
           {t.required !== false ? <Badge variant="secondary">Bắt buộc</Badge> : <Badge variant="outline">Tuỳ chọn</Badge>}
         </div>
+        {t.hint && <p className="mb-2 rounded bg-muted/50 px-2 py-1 text-xs leading-5">{t.hint}</p>}
         {body}
       </div>
     );
   });
 
+  const ask = question?.trim() ? <QuestionBanner text={question.trim()} /> : null;
+
   if (stacked)
     return (
       <div className="space-y-4">
+        {ask}
         {sample}
         <div className="space-y-3">{panels}</div>
       </div>
     );
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="min-w-0">{sample}</div>
-      <div className="space-y-3 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto lg:pr-1">{panels}</div>
+    <div className="space-y-4">
+      {ask}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">{sample}</div>
+        <div className="space-y-3 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto lg:pr-1">{panels}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Câu hỏi của câu — người làm đọc trước rồi mới gán (thay hướng dẫn Markdown của dự án đã bỏ). */
+export function QuestionBanner({ text, className }: { text: string; className?: string }) {
+  return (
+    <div data-tour="cau-hoi" className={cn("flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5", className)}>
+      <CircleHelp className="mt-0.5 size-4 shrink-0 text-primary" />
+      <p className="text-[15px] leading-6 font-medium whitespace-pre-wrap">{text}</p>
     </div>
   );
 }

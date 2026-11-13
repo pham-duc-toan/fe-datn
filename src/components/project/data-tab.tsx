@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Clock, CloudDownload, FileArchive, FileUp, Loader2, Trash2, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, CircleHelp, Clock, CloudDownload, FileArchive, FileUp, Loader2, Pencil, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ImageThumb, ImageViewer } from "@/components/common/image-viewer";
@@ -16,7 +16,8 @@ import { Field } from "@/components/common/misc";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
-import { api, del, post, uploadForm, uploadToSignedUrl } from "@/lib/api";
+import { ActionDialog } from "@/components/common/action-dialog";
+import { api, del, post, put, uploadForm, uploadToSignedUrl } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { ingestState, type Tone } from "@/lib/labels";
@@ -30,10 +31,11 @@ const ACCEPT: Record<string, string> = {
   video: ".mp4,.mov,.webm,.mkv",
 };
 
+/** "question" (tuỳ chọn, mọi loại) = câu hỏi riêng của mẫu; bỏ trống thì labeler thấy câu hỏi chung của dự án. */
 const ROW_HINT: Record<string, string> = {
-  text: '{"text": "Nội dung văn bản", "name": "tuỳ chọn"}',
-  pair: '{"prompt": "Câu hỏi (tuỳ chọn)", "a": "Câu trả lời A", "b": "Câu trả lời B"}',
-  list: '{"prompt": "Câu hỏi (tuỳ chọn)", "items": ["mục 1", "mục 2", "mục 3"]}',
+  text: '{"text": "Nội dung văn bản", "question": "Câu hỏi riêng (tuỳ chọn)", "name": "tuỳ chọn"}',
+  pair: '{"a": "Câu trả lời A", "b": "Câu trả lời B", "question": "Câu hỏi riêng (tuỳ chọn)"}',
+  list: '{"items": ["mục 1", "mục 2", "mục 3"], "question": "Câu hỏi riêng (tuỳ chọn)"}',
 };
 
 /** Số mẫu mỗi lần đăng ký / mỗi lần gửi dòng JSON (khớp dataset.manifest_inline_max_rows mặc định 1.000, file tối đa 100/lần xin link). */
@@ -127,7 +129,7 @@ export function SampleThumb({ s }: { s: Sample }) {
   if (s.modality === "video" && s.fileUrl) return <video src={s.fileUrl} controls className="h-28 w-full rounded bg-black" preload="none" />;
   const c = s.content;
   const text = c?.text ?? (c?.a !== undefined ? `A: ${c.a}\nB: ${c.b}` : c?.items ? c.items.map((x, i) => `${i + 1}. ${x}`).join("\n") : "");
-  return <p className="line-clamp-5 h-28 overflow-hidden rounded bg-muted p-2 text-xs whitespace-pre-wrap">{c?.prompt ? `${c.prompt}\n` : ""}{text}</p>;
+  return <p className="line-clamp-5 h-28 overflow-hidden rounded bg-muted p-2 text-xs whitespace-pre-wrap">{text}</p>;
 }
 
 function StageIcon({ stage }: { stage: Stage }) {
@@ -155,6 +157,37 @@ function UploadRow({ r }: { r: Row }) {
 }
 
 /** Ô mẫu chưa vào bài được (đang chờ / đang xử lý / lỗi): không có link xem, chỉ báo trạng thái. */
+/** Câu hỏi labeler thấy ở mẫu này + nút đặt câu hỏi riêng (chỉ khi dự án còn nháp). */
+function SampleQuestion({ s, common, editable, onSaved, projectId }: { s: Sample; common?: string; editable: boolean; onSaved: () => void; projectId: string }) {
+  const own = s.question?.trim();
+  return (
+    <div className="flex items-start gap-1">
+      <CircleHelp className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+      <p className={`line-clamp-2 min-w-0 flex-1 text-[11px] leading-4 ${own ? "" : "italic text-muted-foreground"}`} title={own || common || undefined}>
+        {own || common || "Chưa có câu hỏi chung"}
+      </p>
+      {editable && (
+        <ActionDialog
+          trigger={
+            <button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Đặt câu hỏi riêng cho mẫu">
+              <Pencil className="size-3" />
+            </button>
+          }
+          title="Câu hỏi riêng của mẫu"
+          description={common ? `Bỏ trống để dùng câu hỏi chung: “${common}”.` : "Bỏ trống để dùng câu hỏi chung của dự án."}
+          fields={[{ name: "question", label: "Câu hỏi", type: "textarea", defaultValue: s.question ?? "", placeholder: common || "vd: Có bao nhiêu người trong ảnh?" }]}
+          confirmLabel="Lưu"
+          successMessage="Đã lưu câu hỏi"
+          onConfirm={async (v) => {
+            await put(`/projects/${projectId}/samples/${s.id}/question`, { question: String(v.question ?? "").trim() || null });
+            onSaved();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export function PendingTile({ s }: { s: Sample }) {
   const entry = ingestState(s.ingestState);
   return (
@@ -458,7 +491,7 @@ export function DataTab({ project: p }: { project: Project }) {
                   <p className="text-sm text-muted-foreground">
                     Điền từng mẫu vào ô bên dưới — không cần biết JSON. Có nhiều mẫu sẵn trong file thì dùng tab “Dán JSONL”. Văn bản được nạp ngay, không phải chờ.
                   </p>
-                  <ManualRows modality={p.modality} busy={busy} onSubmit={postRows} />
+                  <ManualRows modality={p.modality} busy={busy} onSubmit={postRows} commonQuestion={p.labelSchema?.question} />
                   {textResult && (
                     <Alert variant={textResult.skipped > 0 ? "destructive" : "default"}>
                       <AlertTitle>
@@ -597,7 +630,10 @@ export function DataTab({ project: p }: { project: Project }) {
       <Card>
         <CardHeader>
           <CardTitle>Mẫu ({samples.data?.total ?? 0})</CardTitle>
-          <CardDescription>Bản gốc, không có watermark. Mẫu chưa xử lý xong hoặc lỗi hiện kèm trạng thái.</CardDescription>
+          <CardDescription>
+            Bản gốc, không có watermark. Mẫu chưa xử lý xong hoặc lỗi hiện kèm trạng thái. Mỗi mẫu hiện câu hỏi labeler sẽ thấy: câu hỏi riêng của mẫu, hoặc
+            câu hỏi chung của dự án (chữ nghiêng){draft ? " — bấm biểu tượng bút để đặt câu hỏi riêng cho từng mẫu" : ""}.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <QueryState query={samples} empty={(d) => d.items.length === 0}>
@@ -624,6 +660,7 @@ export function DataTab({ project: p }: { project: Project }) {
                       <p className="text-[10px] text-muted-foreground">
                         {s.metadata.width ? `${s.metadata.width}×${s.metadata.height}` : s.metadata.durationSec ? `${s.metadata.durationSec}s` : ""} {formatBytes(s.sizeBytes)}
                       </p>
+                      <SampleQuestion s={s} common={p.labelSchema?.question} editable={draft} onSaved={() => void qc.invalidateQueries({ queryKey: ["samples", p.id] })} projectId={p.id} />
                       {s.ingestState === "ready" && s.mediaState === "preparing" && <p className="text-[10px] text-amber-600">Đang chuẩn bị video…</p>}
                       {s.ingestState === "ready" && s.mediaState === "failed" && (
                         <p className="text-[10px] text-destructive" title={s.mediaError ?? undefined}>

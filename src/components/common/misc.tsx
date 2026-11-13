@@ -1,9 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeSanitize from "rehype-sanitize";
 import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -44,17 +41,6 @@ export function StatCard({ label, value, hint, icon, className }: { label: strin
         {hint && <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>}
       </CardContent>
     </Card>
-  );
-}
-
-/** Markdown của hướng dẫn: render có sanitize, không render HTML thô (mục 4.5). */
-export function Markdown({ children, className }: { children: string; className?: string }) {
-  return (
-    <div className={cn("prose-guideline text-sm", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-        {children}
-      </ReactMarkdown>
-    </div>
   );
 }
 

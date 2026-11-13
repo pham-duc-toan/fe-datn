@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/page-header";
 import { ActionDialog } from "@/components/common/action-dialog";
-import { KeyValue, Markdown } from "@/components/common/misc";
+import { KeyValue } from "@/components/common/misc";
 import { QueryState } from "@/components/common/states";
 import { UserName } from "@/components/common/user-name";
 import { api, post } from "@/lib/api";
@@ -96,7 +96,13 @@ export default function AdminProjectsPage() {
                   </div>
                   <div className="max-h-64 overflow-y-auto rounded-md border p-3">
                     {p.description && <p className="mb-2 text-sm whitespace-pre-wrap">{p.description}</p>}
-                    {p.guideline?.markdown ? <Markdown>{p.guideline.markdown}</Markdown> : <p className="text-sm text-muted-foreground">Không có hướng dẫn.</p>}
+                    {p.labelSchema?.question ? (
+                      <p className="text-sm whitespace-pre-wrap">
+                        <b>Câu hỏi chung:</b> {p.labelSchema.question}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Chưa đặt câu hỏi chung.</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

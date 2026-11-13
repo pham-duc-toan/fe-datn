@@ -33,6 +33,7 @@ type SampleResult = {
   sampleId: string;
   storageKey: string | null;
   sampleContent: SampleContent | null;
+  sampleQuestion: string | null;
   sampleMetadata?: SampleMeta | null;
   approvedCount: number;
   disputed: boolean;
@@ -86,7 +87,7 @@ function ConsensusBadge({ s }: { s: SampleResult }) {
 }
 
 function SampleName({ s, info }: { s: SampleResult; info: Sample | undefined }) {
-  const text = s.sampleContent?.text ?? s.sampleContent?.prompt;
+  const text = s.sampleContent?.text ?? s.sampleQuestion;
   return (
     <div className="min-w-0">
       <div className="truncate font-medium" title={info?.originalName}>
@@ -105,6 +106,7 @@ function Detail({ p, s, info, onMediaError }: { p: Project; s: SampleResult; inf
     modality: p.modality,
     fileUrl: info?.fileUrl ?? null,
     content: s.sampleContent ?? info?.content ?? null,
+    question: s.sampleQuestion,
     metadata: s.sampleMetadata ?? info?.metadata ?? {},
     readOnly: true,
     seed: s.sampleId,

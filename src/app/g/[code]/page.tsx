@@ -49,7 +49,7 @@ type Session = {
   answerableAt: string;
   expiresAt: string;
   labelSchema: LabelSchema | null;
-  questions: { sampleId: string; modality: Modality; fileUrl: string | null; content: SampleContent | null; metadata: SampleMeta }[];
+  questions: { sampleId: string; modality: Modality; fileUrl: string | null; content: SampleContent | null; question: string | null; metadata: SampleMeta }[];
 };
 
 declare global {
@@ -246,6 +246,7 @@ export default function GatePage() {
                       modality={q.modality}
                       fileUrl={q.fileUrl}
                       content={q.content}
+                      question={q.question}
                       metadata={q.metadata}
                       value={answers[q.sampleId] ?? {}}
                       onChange={(v) => setAnswers((a) => ({ ...a, [q.sampleId]: v }))}

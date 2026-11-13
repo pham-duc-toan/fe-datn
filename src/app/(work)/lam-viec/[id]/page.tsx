@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { BookOpen, ChevronLeft, ChevronRight, Eraser, Eye, Flag, FlagTriangleRight, GraduationCap, Loader2, LogOut, Send, ShieldAlert, SkipForward, Timer } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eraser, Eye, Flag, FlagTriangleRight, GraduationCap, Loader2, LogOut, Send, ShieldAlert, SkipForward, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/common/page-header";
-import { Markdown } from "@/components/common/misc";
+
 import { ActionDialog } from "@/components/common/action-dialog";
 import { ErrorState, Loading } from "@/components/common/states";
 import { Workspace } from "@/components/labeling/workspace";
@@ -62,12 +61,12 @@ const FLAG_KEY = (aid: string) => `crowd:attempt-flags:${aid}`;
 /** Tour giới thiệu trang làm bài (sau màn luyện tập) — mỗi điểm dừng là một phần tử `data-tour`. */
 const TOUR: TourStep[] = [
   { target: "danh-sach-cau", title: "Danh sách câu hỏi", body: "Bấm số để nhảy tới câu bất kỳ, làm theo thứ tự tuỳ ý. Ô xanh là câu đã trả lời, chấm vàng là câu bạn đánh dấu xem lại, viền đỏ là câu chưa hợp lệ." },
+  { target: "cau-hoi", title: "Câu hỏi của câu", body: "Đọc câu hỏi trước khi gán: nó cho biết dự án cần bạn trả lời gì về mẫu này. Mỗi câu có thể có câu hỏi riêng. Dòng nhắc nhỏ dưới tên công cụ là lưu ý riêng của công cụ đó." },
   { target: "khu-gan-nhan", title: "Khu gán nhãn", body: "Mẫu ở bên trái, các công cụ ở bên phải — giống hệt bài luyện tập vừa rồi." },
   { target: "danh-dau", title: "Đánh dấu xem lại", body: "Chưa chắc câu nào thì đánh dấu để quay lại sau." },
   { target: "bao-loi", title: "Báo lỗi câu", body: "Mẫu hỏng (không xem được, sai nội dung…) thì báo lỗi. Không bị trừ uy tín; câu bị báo sai nhiều sẽ được loại khỏi chấm." },
   { target: "luu-nhap", title: "Nháp lưu trên máy", body: "Mọi câu trả lời tự lưu nháp ngay trên trình duyệt này. Đổi máy hoặc xoá dữ liệu trình duyệt thì mất nháp." },
   { target: "dong-ho", title: "Thời gian còn lại", body: "Hết giờ mà chưa nộp thì bài bị huỷ và suất trả cho người khác." },
-  { target: "huong-dan", title: "Hướng dẫn của dự án", body: "Luật gán nhãn riêng của dự án — đọc kỹ trước khi làm. Bài được chấm theo độ giống đa số và các câu kiểm tra." },
   { target: "nop-bai", title: "Nộp cả bài", body: "Làm xong thì nộp CẢ BÀI một lần — sau khi nộp không sửa được. Câu bỏ trống bị tính là không giống đa số." },
 ];
 
@@ -310,19 +309,6 @@ export default function ExamPage() {
             <Button variant="ghost" size="sm" onClick={() => setPractice({ only: null, replay: true })} title="Luyện tập lại các công cụ và xem tour trang làm bài">
               <GraduationCap /> Xem lại hướng dẫn
             </Button>
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" data-tour="huong-dan">
-                  <BookOpen /> Hướng dẫn
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-                <SheetHeader>
-                  <SheetTitle>Hướng dẫn gán nhãn</SheetTitle>
-                </SheetHeader>
-                <div className="px-4 pb-6">{p?.guideline?.markdown ? <Markdown>{p.guideline.markdown}</Markdown> : <p className="text-sm text-muted-foreground">Chưa có hướng dẫn.</p>}</div>
-              </SheetContent>
-            </Sheet>
           </>
         }
       />
@@ -405,6 +391,7 @@ export default function ExamPage() {
               modality={q.modality}
               fileUrl={q.fileUrl}
               content={q.content}
+              question={q.question}
               metadata={q.metadata}
               value={value}
               onChange={(v) => change(q.sampleId, v)}

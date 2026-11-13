@@ -22,7 +22,7 @@ function tim(target: string): HTMLElement | null {
  * giao diện trong game. Chặn thao tác với trang khi đang chạy; Esc = bỏ qua, ← / → = lùi / tiếp.
  * Điểm dừng nào không tìm thấy phần tử (vd. màn hình hẹp ẩn mất) thì tự bỏ.
  */
-export function SpotlightTour({ steps, onClose }: { steps: TourStep[]; onClose: (finished: boolean) => void }) {
+export function SpotlightTour({ steps, onClose, finishLabel = "Bắt đầu làm bài" }: { steps: TourStep[]; onClose: (finished: boolean) => void; finishLabel?: string }) {
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   // Điểm dừng có phần tử thật trên trang. Phải đo SAU khi trang được dựng (tour có thể mở cùng lúc trang đổi từ màn
@@ -120,7 +120,7 @@ export function SpotlightTour({ steps, onClose }: { steps: TourStep[]; onClose: 
               <ChevronLeft />
             </Button>
             <Button size="sm" onClick={tiep}>
-              {cuoi ? "Bắt đầu làm bài" : "Tiếp"} {!cuoi && <ChevronRight />}
+              {cuoi ? finishLabel : "Tiếp"} {!cuoi && <ChevronRight />}
             </Button>
           </div>
         </div>
