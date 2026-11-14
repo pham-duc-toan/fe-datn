@@ -24,6 +24,7 @@ import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatVnd } from "@/lib/format";
 import { attemptState, genericStatus, MODALITY_LABEL, phaseOf, projectStatus, TOOL_LABEL, toolKindsText, VISIBILITY_LABEL } from "@/lib/labels";
 import type { JoinRequest, LevelInfo, Paged, ProjectListItem, Slots, Terms } from "@/lib/types";
+import { ToolQuestions } from "@/components/project/tool-questions";
 
 export default function LabelerProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -95,21 +96,14 @@ export default function LabelerProjectPage() {
               }}
             />
           )}
-          {p.labelSchema?.question && (
+          {p.labelSchema && p.labelSchema.tools.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Câu hỏi của dự án</CardTitle>
-                <CardDescription>Mỗi câu trong bài đều hỏi như vậy (vài câu có thể có câu hỏi riêng). Lần đầu gặp công cụ nào, bạn được luyện tập trước khi làm.</CardDescription>
+                <CardDescription>Mỗi câu trong bài, bạn trả lời các câu hỏi này bằng công cụ tương ứng (vài câu có thêm ngữ cảnh riêng). Lần đầu gặp công cụ nào, bạn được luyện tập trước khi làm.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm font-medium whitespace-pre-wrap">{p.labelSchema.question}</p>
-                {p.labelSchema.tools.some((t) => t.hint) && (
-                  <ul className="list-disc space-y-0.5 pl-5 text-sm text-muted-foreground">
-                    {p.labelSchema.tools.filter((t) => t.hint).map((t) => (
-                      <li key={t.name}>{t.hint}</li>
-                    ))}
-                  </ul>
-                )}
+              <CardContent>
+                <ToolQuestions schema={p.labelSchema} />
               </CardContent>
             </Card>
           )}

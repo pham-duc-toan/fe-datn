@@ -11,6 +11,7 @@ import { DEMO_SAMPLES } from "@/components/tutorial/demo-samples";
 import { formatVnd } from "@/lib/format";
 import type { LabelData, LabelSchema, Project, ProjectListItem, Visibility } from "@/lib/types";
 import { MarketCard } from "./market-card";
+import { toolsMissingQuestion } from "@/lib/types";
 
 /** Cấu hình ĐANG SOẠN (chưa cần lưu) — xem trước phản ánh ngay khi người tạo gõ. */
 export type PreviewDraft = {
@@ -59,7 +60,7 @@ export function LabelerPreview({ project: p, draft: d }: { project: Project; dra
     domains: d.domains,
     languages: d.languages,
   };
-  const question = d.schema.question?.trim();
+  const thieuCauHoi = toolsMissingQuestion(d.schema);
 
   return (
     <Sheet>
@@ -80,17 +81,19 @@ export function LabelerPreview({ project: p, draft: d }: { project: Project; dra
               <TabsTrigger value="cho">Thẻ ở chợ dự án</TabsTrigger>
             </TabsList>
             <TabsContent value="cau" className="mt-3 space-y-3">
-              {!question && (
+              {thieuCauHoi.length > 0 && (
                 <Alert variant="destructive">
-                  <AlertDescription>Chưa có câu hỏi chung — labeler sẽ không biết phải trả lời gì. Dự án chưa publish được cho tới khi đặt câu hỏi.</AlertDescription>
+                  <AlertDescription>
+                    Còn {thieuCauHoi.length} công cụ chưa có câu hỏi — labeler sẽ không biết dùng công cụ đó để trả lời gì. Dự án chưa publish được cho tới khi đặt đủ.
+                  </AlertDescription>
                 </Alert>
               )}
               {d.schema.tools.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Thêm ít nhất một công cụ ở thẻ “Câu hỏi và công cụ gán nhãn” để xem trước.</p>
+                <p className="text-sm text-muted-foreground">Thêm ít nhất một công cụ ở thẻ “Công cụ gán nhãn” để xem trước.</p>
               ) : (
                 <>
                   <p className="text-xs text-muted-foreground">
-                    Mẫu minh hoạ — ở bài thật là mẫu của bạn. Mẫu có câu hỏi riêng (đặt ở tab Dữ liệu) thì hiện câu riêng thay câu chung. Bạn có thể gán thử, không lưu gì.
+                    Mẫu minh hoạ — ở bài thật là mẫu của bạn. Câu hỏi hiện ngay trên từng công cụ; mẫu có ngữ cảnh riêng (đặt ở tab Dữ liệu) thì hiện thêm ở đầu câu. Bạn có thể gán thử, không lưu gì.
                   </p>
                   <div className="rounded-lg border border-dashed p-3">
                     <Workspace
@@ -98,7 +101,7 @@ export function LabelerPreview({ project: p, draft: d }: { project: Project; dra
                       modality={p.modality}
                       fileUrl={demo.fileUrl}
                       content={demo.content}
-                      question={question ?? null}
+                      question={null}
                       metadata={demo.metadata}
                       value={value}
                       onChange={setValue}

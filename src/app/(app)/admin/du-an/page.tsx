@@ -16,6 +16,7 @@ import { errorMessage } from "@/lib/errors";
 import { formatDateTime, formatVnd } from "@/lib/format";
 import { MODALITY_LABEL, TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
 import type { Project } from "@/lib/types";
+import { ToolQuestions } from "@/components/project/tool-questions";
 
 export default function AdminProjectsPage() {
   const qc = useQueryClient();
@@ -96,13 +97,8 @@ export default function AdminProjectsPage() {
                   </div>
                   <div className="max-h-64 overflow-y-auto rounded-md border p-3">
                     {p.description && <p className="mb-2 text-sm whitespace-pre-wrap">{p.description}</p>}
-                    {p.labelSchema?.question ? (
-                      <p className="text-sm whitespace-pre-wrap">
-                        <b>Câu hỏi chung:</b> {p.labelSchema.question}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Chưa đặt câu hỏi chung.</p>
-                    )}
+                    <p className="mb-1 text-sm font-semibold">Câu hỏi theo công cụ</p>
+                    <ToolQuestions schema={p.labelSchema} />
                   </div>
                 </CardContent>
               </Card>

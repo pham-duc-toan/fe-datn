@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
-import { CircleHelp, ImageOff } from "lucide-react";
+import { CircleHelp, ImageOff, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/common/states";
 import type { LabelData, LabelSchema, Modality, SampleContent, SampleMeta, Tool } from "@/lib/types";
@@ -22,7 +22,7 @@ export type WorkspaceProps = {
   fileUrl: string | null;
   content: SampleContent | null;
   metadata: SampleMeta;
-  /** Câu hỏi của câu này (câu riêng của mẫu, không có thì câu hỏi chung của dự án) — hiện nổi bật trên mẫu. */
+  /** Ngữ cảnh / câu hỏi riêng của mẫu (tuỳ chọn) — hiện ở đầu câu. Câu hỏi của từng công cụ lấy từ `schema.tools[].question`. */
   question?: string | null;
   value: LabelData;
   onChange?: (v: LabelData) => void;
@@ -178,6 +178,8 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, questi
   }
 
   /* ------------------------- cột công cụ ------------------------- */
+  // Điểm dừng "Câu hỏi" của tour trang làm bài: câu hỏi của công cụ đầu tiên có câu hỏi.
+  const firstAsked = tools.find((t) => t.question?.trim())?.name;
   const panels = tools.map((t) => {
     let body: React.ReactNode = null;
     switch (t.kind) {
@@ -249,13 +251,13 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, questi
           </div>
           {t.required !== false ? <Badge variant="secondary">Bắt buộc</Badge> : <Badge variant="outline">Tuỳ chọn</Badge>}
         </div>
-        {t.hint && <p className="mb-2 rounded bg-muted/50 px-2 py-1 text-xs leading-5">{t.hint}</p>}
+        {t.question?.trim() && <ToolQuestion text={t.question.trim()} tour={t.name === firstAsked} />}
         {body}
       </div>
     );
   });
 
-  const ask = question?.trim() ? <QuestionBanner text={question.trim()} /> : null;
+  const ask = question?.trim() ? <QuestionBanner text={question.trim()} label="Về mẫu này" /> : null;
 
   if (stacked)
     return (
@@ -277,12 +279,25 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, questi
   );
 }
 
-/** Câu hỏi của câu — người làm đọc trước rồi mới gán (thay hướng dẫn Markdown của dự án đã bỏ). */
-export function QuestionBanner({ text, className }: { text: string; className?: string }) {
+/** Ngữ cảnh / câu hỏi riêng của mẫu (tuỳ chọn) — hiện ở đầu câu, trên mẫu. */
+export function QuestionBanner({ text, label, className }: { text: string; label?: string; className?: string }) {
   return (
-    <div data-tour="cau-hoi" className={cn("flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5", className)}>
+    <div className={cn("flex items-start gap-2 rounded-lg border bg-muted/40 px-3 py-2.5", className)}>
+      <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        {label && <div className="text-xs font-medium text-muted-foreground">{label}</div>}
+        <p className="text-[15px] leading-6 whitespace-pre-wrap">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Câu hỏi của một công cụ — người làm đọc trước rồi mới gán (thay câu hỏi chung + hướng dẫn Markdown đã bỏ). */
+export function ToolQuestion({ text, tour = false, className }: { text: string; tour?: boolean; className?: string }) {
+  return (
+    <div data-tour={tour ? "cau-hoi" : undefined} className={cn("mb-2 flex items-start gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2 py-1.5", className)}>
       <CircleHelp className="mt-0.5 size-4 shrink-0 text-primary" />
-      <p className="text-[15px] leading-6 font-medium whitespace-pre-wrap">{text}</p>
+      <p className="text-sm leading-5 font-medium whitespace-pre-wrap">{text}</p>
     </div>
   );
 }

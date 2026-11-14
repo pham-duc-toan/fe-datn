@@ -39,7 +39,7 @@ export default function NewProjectPage() {
     setBusy(true);
     try {
       const p = await post<Project>("/projects", { name: name.trim(), description: desc.trim(), modality: tpl?.modality ?? modality, visibility: vis });
-      // Tạo từ mẫu: chép tập nhãn (kèm câu hỏi chung + dòng nhắc công cụ) sang dự án, không tham chiếu mẫu.
+      // Tạo từ mẫu: chép tập nhãn (mỗi công cụ kèm câu hỏi) sang dự án, không tham chiếu mẫu.
       if (tpl?.labelSchema) await patch(`/projects/${p.id}`, { labelSchema: { ...tpl.labelSchema, modality: tpl.modality } });
       toast.success("Đã tạo dự án");
       router.push(`/du-an/${p.id}?tab=cau-hinh`);

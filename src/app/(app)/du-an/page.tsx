@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
-import { DeleteProjectButton } from "@/components/project/delete-project";
+import { canDeleteProject, DeleteProjectButton } from "@/components/project/delete-project";
 import { api } from "@/lib/api";
 import { formatDate, formatVnd } from "@/lib/format";
 import { MODALITY_LABEL, PROJECT_STATUS, projectStatus, VISIBILITY_LABEL } from "@/lib/labels";
@@ -90,8 +90,8 @@ export default function MyProjectsPage() {
                           <StatusBadge entry={projectStatus(p.status)} />
                         </TableCell>
                         <TableCell>
-                          {p.isOwner && p.status === "draft" && (
-                            <DeleteProjectButton compact id={p.id} name={p.name} onDeleted={() => void qc.invalidateQueries({ queryKey: ["projects"] })} />
+                          {p.isOwner && canDeleteProject(p.status) && (
+                            <DeleteProjectButton compact id={p.id} name={p.name} status={p.status} onDeleted={() => void qc.invalidateQueries({ queryKey: ["projects"] })} />
                           )}
                         </TableCell>
                       </TableRow>

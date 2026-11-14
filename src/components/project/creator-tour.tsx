@@ -23,14 +23,9 @@ export const CREATOR_TOUR: TourStep[] = [
     body: "Tên và mô tả hiện trên thẻ dự án ở chợ. Chế độ tham gia quyết định ai được vào: công khai, cần duyệt đơn, hay chỉ người được mời (riêng tư không hiện ở chợ).",
   },
   {
-    target: "cfg-cau-hoi",
-    title: "Câu hỏi chung — bắt buộc",
-    body: "Labeler thấy câu hỏi này nổi bật trên mẫu ở MỌI câu, nên viết rõ cần trả lời gì (vd “Con vật trong ảnh là gì?”). Mẫu cần hỏi khác thì đặt câu hỏi riêng ở tab Dữ liệu.",
-  },
-  {
     target: "cfg-cong-cu",
-    title: "Công cụ gán nhãn",
-    body: "Mỗi công cụ là một cách trả lời (chọn lớp, vẽ khung, bôi đoạn…). Dòng nhắc của công cụ hiện ngay dưới tên công cụ. Lần đầu gặp công cụ nào, labeler được luyện tập trước.",
+    title: "Công cụ gán nhãn — mỗi công cụ một câu hỏi",
+    body: "Mỗi công cụ là một cách trả lời (chọn lớp, vẽ khung, bôi đoạn…) và BẮT BUỘC có câu hỏi riêng, viết rõ dùng công cụ đó để trả lời gì (vd “Khoanh tất cả xe trong ảnh”). Labeler thấy câu hỏi nổi bật ngay trên công cụ. Lần đầu gặp công cụ nào, labeler được luyện tập trước.",
   },
   {
     target: "cfg-gia",
@@ -55,6 +50,6 @@ export const CREATOR_TOUR: TourStep[] = [
   {
     target: "du-an-tabs",
     title: "Bước tiếp theo",
-    body: "Nạp mẫu ở tab Dữ liệu (đặt câu hỏi riêng cho từng mẫu nếu cần), thêm câu kiểm tra ở tab Câu vàng, rồi publish khi danh sách bên trên đã xanh hết. Mỗi ô có biểu tượng ⓘ giải thích chi tiết.",
+    body: "Nạp mẫu ở tab Dữ liệu (thêm ngữ cảnh riêng cho từng mẫu nếu cần), thêm câu kiểm tra ở tab Câu vàng, rồi publish khi danh sách bên trên đã xanh hết. Mỗi ô có biểu tượng ⓘ giải thích chi tiết.",
   },
 ];

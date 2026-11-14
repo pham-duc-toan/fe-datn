@@ -22,7 +22,7 @@ import type { AttemptSummary, Progress as ProgressT, Project, Readiness } from "
 
 const ESCROW_STATE: Record<string, string> = { active: "đang giữ", closing: "đang chờ trả nốt thưởng", closed: "đã đóng" };
 import { readinessRefetch, useSetProject } from "./use-project";
-import { DeleteProjectButton } from "./delete-project";
+import { canDeleteProject, DeleteProjectButton } from "./delete-project";
 
 const CLOSE_REASON: Record<string, string> = {
   da_co_bai_nop: "Đã có bài nộp — không huỷ được nữa. Dùng “Kết thúc sớm” để chấm các bài đã nộp và hoàn phần suất thừa.",
@@ -291,16 +291,21 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
           />
         </CardContent>
       </Card>
-      {(p.status === "draft" || (p.status === "cancelled" && !p.publishedAt)) && (
+      {p.isOwner && canDeleteProject(p.status) && (
         <Card className="border-destructive/30">
           <CardHeader>
             <CardTitle>Xoá dự án</CardTitle>
-            <CardDescription>Dự án chưa từng publish nên chưa có tiền ký quỹ hay bài làm: xoá hẳn được, kèm toàn bộ dữ liệu đã nạp.</CardDescription>
+            <CardDescription>
+              {p.status === "draft"
+                ? "Dự án chưa publish: xoá hẳn được, kèm toàn bộ dữ liệu đã nạp."
+                : "Dự án đã kết thúc: xoá khỏi danh sách dự án của bạn. Hãy tải kết quả về trước nếu còn cần."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <DeleteProjectButton
               id={p.id}
               name={p.name}
+              status={p.status}
               onDeleted={() => {
                 void qc.invalidateQueries({ queryKey: ["projects"] });
                 router.push("/du-an");

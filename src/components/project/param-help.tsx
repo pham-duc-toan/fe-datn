@@ -25,12 +25,8 @@ export const PARAM_HELP = {
     shows: "Dự án công khai và cần duyệt hiện ở chợ; dự án riêng tư chỉ thành viên mới thấy.",
   },
   question: {
-    effect: "Bắt buộc trước khi publish. Câu hỏi cho biết labeler phải trả lời gì về mỗi mẫu; mẫu nào có câu hỏi riêng thì dùng câu riêng.",
-    shows: "Dòng nổi bật ngay trên mẫu ở MỌI câu trong bài, ở trang dự án trong chợ và trên cổng vượt link.",
-  },
-  toolHint: {
-    effect: "Lưu ý riêng cho một công cụ (vd “khoanh sát mép, kể cả phần bị che”). Không bắt buộc.",
-    shows: "Dòng chữ nhỏ ngay dưới tên công cụ ở cột công cụ bên phải.",
+    effect: "Bắt buộc trước khi publish, mỗi công cụ một câu. Cho biết labeler dùng công cụ này để trả lời gì (vd “Khoanh tất cả xe trong ảnh”). Lưu ý cách làm (khoanh sát mép…) cũng viết luôn vào câu này.",
+    shows: "Dòng nổi bật ngay trên công cụ ở MỌI câu trong bài, ở trang dự án trong chợ và trên cổng vượt link.",
   },
   tools: {
     effect: "Quyết định labeler trả lời bằng cách nào (chọn lớp, vẽ khung, bôi đoạn…) và bài được chấm theo đa số của từng công cụ.",
@@ -113,8 +109,8 @@ export const PARAM_HELP = {
     shows: "Labeler không thấy.",
   },
   sampleQuestion: {
-    effect: "Thay câu hỏi chung cho riêng mẫu này. Cùng nội dung nhưng câu hỏi khác nhau là hai mẫu khác nhau.",
-    shows: "Dòng câu hỏi trên mẫu ở câu đó.",
+    effect: "Ngữ cảnh / câu hỏi riêng cho mẫu này (tuỳ chọn) — vd câu hỏi gốc của cặp câu trả lời, câu hỏi về từng ảnh. Không thay câu hỏi của công cụ. Cùng nội dung nhưng câu riêng khác nhau là hai mẫu khác nhau.",
+    shows: "Dải “Về mẫu này” ở đầu câu đó, phía trên mẫu.",
   },
 } satisfies Record<string, ParamHelp>;
 

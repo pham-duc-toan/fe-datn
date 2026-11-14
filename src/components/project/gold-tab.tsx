@@ -177,7 +177,7 @@ export function GoldTab({ project: p }: { project: Project }) {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Workspace schema={schema} modality={p.modality} fileUrl={sample.fileUrl} content={sample.content} question={sample.question ?? schema.question} metadata={sample.metadata} value={value} onChange={setValue} seed={sample.id} />
+            <Workspace schema={schema} modality={p.modality} fileUrl={sample.fileUrl} content={sample.content} question={sample.question} metadata={sample.metadata} value={value} onChange={setValue} seed={sample.id} />
             <RadioGroup value={purpose} onValueChange={(v) => setPurpose(v as typeof purpose)} className="flex gap-4">
               <label className="flex items-center gap-2 text-sm">
                 <RadioGroupItem value="qualityCheck" /> Kiểm tra chất lượng

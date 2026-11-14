@@ -65,15 +65,21 @@ export type Tool = {
   integer?: boolean;
   tolerance?: number;
   rotatable?: boolean;
-  /** Dòng nhắc riêng của công cụ, hiện ngay dưới tên công cụ (vd "Khoanh sát mép"). */
-  hint?: string;
+  /**
+   * Câu hỏi của công cụ (≤ 300 ký tự) — labeler thấy ngay trên công cụ. Bắt buộc trước khi publish (lưu nháp được khi
+   * còn thiếu); thay câu hỏi chung + dòng nhắc `hint` đã bỏ (kiến trúc 3.35).
+   */
+  question?: string;
 };
 
 /**
- * Tập nhãn. `question` = câu hỏi CHUNG labeler thấy ở đầu mỗi câu (bắt buộc trước khi publish); mẫu có câu riêng
- * (`Sample.question`) thì hiện câu riêng thay thế. Hướng dẫn Markdown của dự án đã bỏ.
+ * Tập nhãn. Không có câu hỏi chung: mỗi công cụ một câu hỏi (`tools[].question`). Mẫu có thể thêm ngữ cảnh riêng
+ * (`Sample.question`, tuỳ chọn) hiện ở đầu câu. Hướng dẫn Markdown của dự án đã bỏ.
  */
-export type LabelSchema = { modality: Modality; segmentSeconds?: number | null; question?: string; tools: Tool[] };
+export type LabelSchema = { modality: Modality; segmentSeconds?: number | null; tools: Tool[] };
+
+/** Công cụ chưa có câu hỏi (rỗng / toàn khoảng trắng) — backend chặn publish (`chua_co_cau_hoi`). */
+export const toolsMissingQuestion = (s: LabelSchema | null | undefined): Tool[] => (s?.tools ?? []).filter((t) => !t.question?.trim());
 
 /** Dữ liệu nhãn: khoá = tên công cụ. */
 export type LabelData = Record<string, unknown>;
@@ -91,7 +97,7 @@ export type SampleMeta = {
   fps?: number;
 };
 
-/** Nội dung mẫu không phải file. Câu hỏi KHÔNG nằm ở đây mà ở `question` của mẫu / tập nhãn. */
+/** Nội dung mẫu không phải file. Câu hỏi KHÔNG nằm ở đây mà ở `question` của từng công cụ (tập nhãn) và ngữ cảnh `question` của mẫu. */
 export type SampleContent = { text?: string; a?: string; b?: string; items?: string[] };
 
 /* ---------- Dự án ---------- */
@@ -143,6 +149,8 @@ export type Project = {
   languages: string[];
   deleteFilesAfterClose: boolean;
   filesPurgedAt: string | null;
+  /** Chỉ admin: lúc doanh nghiệp đã xoá dự án đã kết thúc khỏi tài khoản của họ (dữ liệu vẫn giữ). */
+  hiddenByOwnerAt?: string | null;
   isOwner: boolean;
   ownerId: string | null;
   escrowVnd: number | null;
@@ -189,6 +197,8 @@ export type ProjectLimits = {
 export type Readiness = {
   ready: boolean;
   missing: string[];
+  /** Tên khoá các công cụ chưa có câu hỏi (đi kèm `chua_co_cau_hoi`). */
+  toolsMissingQuestion: string[];
   warnings: string[];
   sampleCount: number;
   /** Số file video media-svc đang chuẩn bị (chặn publish / duyệt). */
@@ -237,7 +247,7 @@ export type Sample = {
   sizeBytes: number | null;
   fileUrl: string | null;
   content: SampleContent | null;
-  /** Câu hỏi RIÊNG của mẫu. null = labeler thấy câu hỏi chung của dự án. */
+  /** Ngữ cảnh / câu hỏi RIÊNG của mẫu (tuỳ chọn), hiện ở đầu câu. null = không có — labeler chỉ thấy câu hỏi của từng công cụ. */
   question: string | null;
   metadata: SampleMeta;
   ingestState: IngestState;
@@ -319,7 +329,7 @@ export type AttemptQuestion = {
   modality: Modality;
   fileUrl: string | null;
   content: SampleContent | null;
-  /** Câu hỏi labeler thấy ở câu này (đã gộp: câu riêng, không có thì câu chung). */
+  /** Ngữ cảnh / câu hỏi riêng của mẫu (tuỳ chọn). Câu hỏi của từng công cụ nằm trong labelSchema.tools[].question. */
   question: string | null;
   metadata: SampleMeta;
   answer: LabelData | null;
@@ -416,7 +426,7 @@ export type Annotation = {
   source: "professional" | "linkGateway";
   fileUrl: string | null;
   sampleContent: SampleContent | null;
-  /** Câu hỏi của mẫu (câu riêng, không có thì câu hỏi chung). */
+  /** Ngữ cảnh / câu hỏi riêng của mẫu (tuỳ chọn). */
   sampleQuestion: string | null;
   sampleMetadata: SampleMeta;
   labelerId: string | null;

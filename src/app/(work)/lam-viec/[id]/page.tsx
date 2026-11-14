@@ -61,7 +61,7 @@ const FLAG_KEY = (aid: string) => `crowd:attempt-flags:${aid}`;
 /** Tour giới thiệu trang làm bài (sau màn luyện tập) — mỗi điểm dừng là một phần tử `data-tour`. */
 const TOUR: TourStep[] = [
   { target: "danh-sach-cau", title: "Danh sách câu hỏi", body: "Bấm số để nhảy tới câu bất kỳ, làm theo thứ tự tuỳ ý. Ô xanh là câu đã trả lời, chấm vàng là câu bạn đánh dấu xem lại, viền đỏ là câu chưa hợp lệ." },
-  { target: "cau-hoi", title: "Câu hỏi của câu", body: "Đọc câu hỏi trước khi gán: nó cho biết dự án cần bạn trả lời gì về mẫu này. Mỗi câu có thể có câu hỏi riêng. Dòng nhắc nhỏ dưới tên công cụ là lưu ý riêng của công cụ đó." },
+  { target: "cau-hoi", title: "Câu hỏi của công cụ", body: "Mỗi công cụ có câu hỏi riêng, hiện nổi bật trên ô công cụ: đọc trước khi gán để biết dùng công cụ đó trả lời gì. Câu nào có dải “Về mẫu này” ở đầu thì đó là ngữ cảnh riêng của mẫu." },
   { target: "khu-gan-nhan", title: "Khu gán nhãn", body: "Mẫu ở bên trái, các công cụ ở bên phải — giống hệt bài luyện tập vừa rồi." },
   { target: "danh-dau", title: "Đánh dấu xem lại", body: "Chưa chắc câu nào thì đánh dấu để quay lại sau." },
   { target: "bao-loi", title: "Báo lỗi câu", body: "Mẫu hỏng (không xem được, sai nội dung…) thì báo lỗi. Không bị trừ uy tín; câu bị báo sai nhiều sẽ được loại khỏi chấm." },

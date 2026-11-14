@@ -27,6 +27,7 @@ import { formatBytes, formatDateTime, formatNumber, formatVnd } from "@/lib/form
 import { MEMBER_ROLE, MODALITY_LABEL, projectStatus, READINESS_LABEL, READINESS_WARNING, TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
 import type { GoldItem, IngestStatus, Member, Paged, Project, Readiness, Sample, Tool } from "@/lib/types";
 import { useUrlPage } from "@/lib/use-url-state";
+import { ToolQuestions } from "@/components/project/tool-questions";
 
 const yesNo = (b: boolean | null | undefined) => (b ? "Có" : "Không");
 
@@ -70,6 +71,11 @@ export default function AdminProjectDetailPage() {
             title={
               <span className="flex flex-wrap items-center gap-2">
                 {p.name} <StatusBadge entry={projectStatus(p.status)} />
+                {p.hiddenByOwnerAt && (
+                  <ToneBadge tone="muted" className="font-normal">
+                    Doanh nghiệp đã xoá khỏi tài khoản lúc {formatDateTime(p.hiddenByOwnerAt)} — dữ liệu vẫn giữ
+                  </ToneBadge>
+                )}
               </span>
             }
             description={
@@ -341,15 +347,11 @@ function SchemaPanel({ p }: { p: Project }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Câu hỏi chung</CardTitle>
-          <CardDescription>Người làm thấy câu này ở đầu mỗi câu; mẫu có câu hỏi riêng thì hiện câu riêng thay thế.</CardDescription>
+          <CardTitle>Câu hỏi theo công cụ</CardTitle>
+          <CardDescription>Người làm thấy câu hỏi ngay trên từng công cụ; mẫu có ngữ cảnh riêng thì hiện thêm ở đầu câu.</CardDescription>
         </CardHeader>
         <CardContent>
-          {p.labelSchema?.question ? (
-            <p className="rounded-md border bg-muted/40 p-3 text-sm whitespace-pre-wrap">{p.labelSchema.question}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Chưa đặt câu hỏi chung.</p>
-          )}
+          <ToolQuestions schema={p.labelSchema} />
         </CardContent>
       </Card>
     </div>

@@ -214,8 +214,8 @@ export function ConfigTab({ project: p }: { project: Project }) {
       </SaveCard>
 
       <SaveCard
-        title="Câu hỏi và công cụ gán nhãn"
-        description="Câu hỏi chung cho labeler biết phải trả lời gì về mỗi mẫu; công cụ là cách trả lời. Labeler học từng loại công cụ ở màn luyện tập trước khi làm bài — không cần viết hướng dẫn riêng."
+        title="Công cụ gán nhãn"
+        description="Mỗi công cụ là một cách trả lời và BẮT BUỘC có câu hỏi riêng cho labeler biết dùng nó để trả lời gì. Labeler học từng loại công cụ ở màn luyện tập trước khi làm bài — không cần viết hướng dẫn riêng."
         onSave={() => save("labelSchema", { ...schema, modality: p.modality })}
         disabled={!draft}
       >

@@ -14,16 +14,24 @@ import { CLASS_TOOLS, LIST_TOOLS, TOOL_LABEL, TOOLS_BY_MODALITY } from "@/lib/la
 import { autoToolName } from "@/lib/tool-names";
 import { TOOL_GUIDE, ToolGuideDialog } from "@/components/project/tool-guide";
 import { HelpTip } from "@/components/project/param-help";
-import { QuestionBanner } from "@/components/labeling/workspace";
 
-/** Câu hỏi gợi ý theo loại dữ liệu — chỉ là placeholder, doanh nghiệp tự viết theo bài toán. */
-const QUESTION_PLACEHOLDER: Record<Modality, string> = {
-  image: "vd: Con vật trong ảnh là gì?",
-  text: "vd: Câu bình luận này mang sắc thái gì?",
-  audio: "vd: Người nói trong đoạn này nói gì?",
-  video: "vd: Trong video có những phương tiện nào?",
-  pair: "vd: Câu trả lời nào đúng và hữu ích hơn?",
-  list: "vd: Xếp các câu trả lời từ tốt nhất tới kém nhất.",
+/** Câu hỏi gợi ý theo loại công cụ — chỉ là placeholder, doanh nghiệp tự viết theo bài toán. */
+const QUESTION_PLACEHOLDER: Record<ToolKind, string> = {
+  classification: "vd: Con vật trong ảnh là gì?",
+  bbox: "vd: Khoanh tất cả xe trong ảnh.",
+  polygon: "vd: Khoanh vùng mặt đường.",
+  span: "vd: Bôi đen tên người, địa điểm trong câu.",
+  transcription: "vd: Người nói trong đoạn này nói gì?",
+  temporalSegment: "vd: Đánh dấu các đoạn có tiếng nói.",
+  pairwise: "vd: Câu trả lời nào đúng và hữu ích hơn?",
+  freeText: "vd: Viết lại câu này cho lịch sự hơn.",
+  number: "vd: Có bao nhiêu người trong ảnh?",
+  keypoint: "vd: Đặt điểm vào hai mắt và mũi.",
+  polyline: "vd: Vẽ theo vạch kẻ đường.",
+  mask: "vd: Tô vùng có người.",
+  track: "vd: Theo dấu từng xe qua các khung hình.",
+  relation: "vd: Nối mỗi người với nơi người đó làm việc.",
+  ranking: "vd: Xếp các câu trả lời từ tốt nhất tới kém nhất.",
 };
 
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
@@ -91,6 +99,7 @@ function ToolEditor({ tool, projectName, modality, all, thresholds, onChange, on
                 name: autoToolName(projectName, v as ToolKind, all.filter((t) => t !== tool)),
                 kind: v as ToolKind,
                 required: tool.required,
+                question: tool.question,
                 classes: CLASS_TOOLS.includes(v as ToolKind) ? tool.classes ?? DEFAULT_CLASSES : undefined,
               })
             }
@@ -128,16 +137,19 @@ function ToolEditor({ tool, projectName, modality, all, thresholds, onChange, on
       <Field
         label={
           <span className="inline-flex items-center gap-1">
-            Dòng nhắc cho công cụ (tuỳ chọn) <HelpTip k="toolHint" />
+            Câu hỏi của công cụ <HelpTip k="question" />
           </span>
         }
+        required
+        error={tool.question?.trim() ? undefined : "Chưa có câu hỏi — dự án chưa publish được."}
+        hint="Labeler thấy câu này ngay trên công cụ."
       >
-        <Input
-          className="h-8"
+        <Textarea
+          rows={2}
           maxLength={300}
-          value={tool.hint ?? ""}
-          placeholder="vd: Khoanh sát mép, kể cả phần bị che khuất"
-          onChange={(e) => set({ hint: e.target.value || undefined })}
+          value={tool.question ?? ""}
+          placeholder={QUESTION_PLACEHOLDER[tool.kind]}
+          onChange={(e) => set({ question: e.target.value || undefined })}
         />
       </Field>
       {hasClasses && (
@@ -287,35 +299,8 @@ export function SchemaEditor({
       </div>
     );
 
-  const question = value.question ?? "";
-
   return (
     <div className="space-y-3">
-      <div data-tour="cfg-cau-hoi" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
-        <Field
-          label={
-            <span className="inline-flex items-center gap-1">
-              Câu hỏi chung <HelpTip k="question" />
-            </span>
-          }
-          required
-          hint="Bắt buộc trước khi publish. Mẫu cần hỏi khác thì đặt câu hỏi riêng cho mẫu đó ở tab Dữ liệu."
-        >
-          <Textarea
-            rows={2}
-            maxLength={1000}
-            value={question}
-            placeholder={QUESTION_PLACEHOLDER[modality]}
-            onChange={(e) => onChange({ ...value, question: e.target.value || undefined })}
-          />
-        </Field>
-        {question.trim() && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Labeler thấy ở đầu mỗi câu:</p>
-            <QuestionBanner text={question.trim()} className="bg-background" />
-          </div>
-        )}
-      </div>
       {(modality === "audio" || modality === "video") && (
         <Field label="Cắt file dài thành đoạn (giây)" hint="5–3600. Mỗi đoạn là một câu riêng (vd file 5 phút, cắt 30 giây → 10 câu). Bỏ trống = mỗi file một câu." className="max-w-md">
           <Input type="number" value={value.segmentSeconds ?? ""} onChange={(e) => onChange({ ...value, segmentSeconds: numOrNull(e.target.value) })} />

@@ -31,11 +31,11 @@ const ACCEPT: Record<string, string> = {
   video: ".mp4,.mov,.webm,.mkv",
 };
 
-/** "question" (tuỳ chọn, mọi loại) = câu hỏi riêng của mẫu; bỏ trống thì labeler thấy câu hỏi chung của dự án. */
+/** "question" (tuỳ chọn, mọi loại) = ngữ cảnh / câu hỏi riêng của mẫu, hiện ở đầu câu (câu hỏi của công cụ đặt ở tab Cấu hình). */
 const ROW_HINT: Record<string, string> = {
-  text: '{"text": "Nội dung văn bản", "question": "Câu hỏi riêng (tuỳ chọn)", "name": "tuỳ chọn"}',
-  pair: '{"a": "Câu trả lời A", "b": "Câu trả lời B", "question": "Câu hỏi riêng (tuỳ chọn)"}',
-  list: '{"items": ["mục 1", "mục 2", "mục 3"], "question": "Câu hỏi riêng (tuỳ chọn)"}',
+  text: '{"text": "Nội dung văn bản", "question": "Ngữ cảnh riêng (tuỳ chọn)", "name": "tuỳ chọn"}',
+  pair: '{"a": "Câu trả lời A", "b": "Câu trả lời B", "question": "Câu hỏi gốc (tuỳ chọn)"}',
+  list: '{"items": ["mục 1", "mục 2", "mục 3"], "question": "Ngữ cảnh riêng (tuỳ chọn)"}',
 };
 
 /** Số mẫu mỗi lần đăng ký / mỗi lần gửi dòng JSON (khớp dataset.manifest_inline_max_rows mặc định 1.000, file tối đa 100/lần xin link). */
@@ -157,27 +157,27 @@ function UploadRow({ r }: { r: Row }) {
 }
 
 /** Ô mẫu chưa vào bài được (đang chờ / đang xử lý / lỗi): không có link xem, chỉ báo trạng thái. */
-/** Câu hỏi labeler thấy ở mẫu này + nút đặt câu hỏi riêng (chỉ khi dự án còn nháp). */
-function SampleQuestion({ s, common, editable, onSaved, projectId }: { s: Sample; common?: string; editable: boolean; onSaved: () => void; projectId: string }) {
+/** Ngữ cảnh riêng của mẫu (tuỳ chọn) + nút sửa (chỉ khi dự án còn nháp). */
+function SampleQuestion({ s, editable, onSaved, projectId }: { s: Sample; editable: boolean; onSaved: () => void; projectId: string }) {
   const own = s.question?.trim();
   return (
     <div className="flex items-start gap-1">
       <CircleHelp className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
-      <p className={`line-clamp-2 min-w-0 flex-1 text-[11px] leading-4 ${own ? "" : "italic text-muted-foreground"}`} title={own || common || undefined}>
-        {own || common || "Chưa có câu hỏi chung"}
+      <p className={`line-clamp-2 min-w-0 flex-1 text-[11px] leading-4 ${own ? "" : "italic text-muted-foreground"}`} title={own || undefined}>
+        {own || "Không có ngữ cảnh riêng"}
       </p>
       {editable && (
         <ActionDialog
           trigger={
-            <button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Đặt câu hỏi riêng cho mẫu">
+            <button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Đặt ngữ cảnh riêng cho mẫu">
               <Pencil className="size-3" />
             </button>
           }
-          title="Câu hỏi riêng của mẫu"
-          description={common ? `Bỏ trống để dùng câu hỏi chung: “${common}”.` : "Bỏ trống để dùng câu hỏi chung của dự án."}
-          fields={[{ name: "question", label: "Câu hỏi", type: "textarea", defaultValue: s.question ?? "", placeholder: common || "vd: Có bao nhiêu người trong ảnh?" }]}
+          title="Ngữ cảnh riêng của mẫu"
+          description="Tuỳ chọn — hiện ở đầu câu, phía trên mẫu. Không thay câu hỏi của công cụ. Bỏ trống để xoá."
+          fields={[{ name: "question", label: "Ngữ cảnh / câu hỏi riêng", type: "textarea", defaultValue: s.question ?? "", placeholder: "vd: Có bao nhiêu người trong ảnh?" }]}
           confirmLabel="Lưu"
-          successMessage="Đã lưu câu hỏi"
+          successMessage="Đã lưu ngữ cảnh"
           onConfirm={async (v) => {
             await put(`/projects/${projectId}/samples/${s.id}/question`, { question: String(v.question ?? "").trim() || null });
             onSaved();
@@ -491,7 +491,7 @@ export function DataTab({ project: p }: { project: Project }) {
                   <p className="text-sm text-muted-foreground">
                     Điền từng mẫu vào ô bên dưới — không cần biết JSON. Có nhiều mẫu sẵn trong file thì dùng tab “Dán JSONL”. Văn bản được nạp ngay, không phải chờ.
                   </p>
-                  <ManualRows modality={p.modality} busy={busy} onSubmit={postRows} commonQuestion={p.labelSchema?.question} />
+                  <ManualRows modality={p.modality} busy={busy} onSubmit={postRows} />
                   {textResult && (
                     <Alert variant={textResult.skipped > 0 ? "destructive" : "default"}>
                       <AlertTitle>
@@ -631,8 +631,8 @@ export function DataTab({ project: p }: { project: Project }) {
         <CardHeader>
           <CardTitle>Mẫu ({samples.data?.total ?? 0})</CardTitle>
           <CardDescription>
-            Bản gốc, không có watermark. Mẫu chưa xử lý xong hoặc lỗi hiện kèm trạng thái. Mỗi mẫu hiện câu hỏi labeler sẽ thấy: câu hỏi riêng của mẫu, hoặc
-            câu hỏi chung của dự án (chữ nghiêng){draft ? " — bấm biểu tượng bút để đặt câu hỏi riêng cho từng mẫu" : ""}.
+            Bản gốc, không có watermark. Mẫu chưa xử lý xong hoặc lỗi hiện kèm trạng thái. Mỗi mẫu hiện ngữ cảnh riêng (nếu có) — labeler thấy ở đầu câu,
+            phía trên câu hỏi của từng công cụ{draft ? " — bấm biểu tượng bút để đặt ngữ cảnh riêng cho từng mẫu" : ""}.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -660,7 +660,7 @@ export function DataTab({ project: p }: { project: Project }) {
                       <p className="text-[10px] text-muted-foreground">
                         {s.metadata.width ? `${s.metadata.width}×${s.metadata.height}` : s.metadata.durationSec ? `${s.metadata.durationSec}s` : ""} {formatBytes(s.sizeBytes)}
                       </p>
-                      <SampleQuestion s={s} common={p.labelSchema?.question} editable={draft} onSaved={() => void qc.invalidateQueries({ queryKey: ["samples", p.id] })} projectId={p.id} />
+                      <SampleQuestion s={s} editable={draft} onSaved={() => void qc.invalidateQueries({ queryKey: ["samples", p.id] })} projectId={p.id} />
                       {s.ingestState === "ready" && s.mediaState === "preparing" && <p className="text-[10px] text-amber-600">Đang chuẩn bị video…</p>}
                       {s.ingestState === "ready" && s.mediaState === "failed" && (
                         <p className="text-[10px] text-destructive" title={s.mediaError ?? undefined}>

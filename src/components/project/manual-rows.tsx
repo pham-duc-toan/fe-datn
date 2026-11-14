@@ -46,14 +46,11 @@ function toRow(modality: Modality, d: Draft): { row: Record<string, unknown> } |
 
 const LABEL: Record<string, string> = { text: "văn bản", pair: "cặp câu trả lời", list: "danh sách" };
 
-/** Ô câu hỏi RIÊNG của một mẫu — bỏ trống thì labeler thấy câu hỏi chung của dự án. */
-export function QuestionInput({ value, onChange, common }: { value: string; onChange: (v: string) => void; common?: string }) {
+/** Ô ngữ cảnh / câu hỏi RIÊNG của một mẫu (tuỳ chọn) — hiện ở đầu câu, không thay câu hỏi của công cụ. */
+export function QuestionInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <Field
-      label="Câu hỏi riêng của mẫu (tuỳ chọn)"
-      hint={common ? `Bỏ trống = labeler thấy câu hỏi chung: “${common}”.` : "Bỏ trống = labeler thấy câu hỏi chung của dự án (đặt ở tab Cấu hình)."}
-    >
-      <Input value={value} maxLength={1000} onChange={(e) => onChange(e.target.value)} placeholder={common || "vd: Có bao nhiêu người trong ảnh?"} />
+    <Field label="Ngữ cảnh riêng của mẫu (tuỳ chọn)" hint="Hiện ở đầu câu, phía trên mẫu — vd câu hỏi gốc của cặp câu trả lời. Câu hỏi của từng công cụ đặt ở tab Cấu hình.">
+      <Input value={value} maxLength={1000} onChange={(e) => onChange(e.target.value)} placeholder="vd: Thủ đô của Việt Nam là gì?" />
     </Field>
   );
 }
@@ -66,13 +63,10 @@ export function ManualRows({
   modality,
   busy,
   onSubmit,
-  commonQuestion,
 }: {
   modality: Modality;
   busy: boolean;
   onSubmit: (rows: Record<string, unknown>[]) => Promise<boolean>;
-  /** Câu hỏi chung của dự án — gợi ý trong ô câu hỏi riêng (bỏ trống thì dùng câu này). */
-  commonQuestion?: string;
 }) {
   const [drafts, setDrafts] = useState<Draft[]>(() => [blank(modality)]);
   const [bulk, setBulk] = useState("");
@@ -137,7 +131,7 @@ export function ManualRows({
               </Field>
             )}
 
-            <QuestionInput value={d.question} onChange={(v) => patch(d.key, { question: v })} common={commonQuestion} />
+            <QuestionInput value={d.question} onChange={(v) => patch(d.key, { question: v })} />
 
             {modality === "pair" && (
               <>

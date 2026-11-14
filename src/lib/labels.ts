@@ -192,7 +192,7 @@ export const genericStatus = (s: string | null | undefined) => pick(GENERIC_STAT
 /** Mã thiếu ở checklist publish (mục 4.8). */
 export const READINESS_LABEL: Record<string, string> = {
   chua_co_tap_nhan: "Chưa có tập nhãn",
-  chua_co_cau_hoi: "Chưa có câu hỏi chung (tab Cấu hình → Câu hỏi và công cụ gán nhãn)",
+  chua_co_cau_hoi: "Còn công cụ chưa có câu hỏi (tab Cấu hình → Công cụ gán nhãn)",
   chua_cau_hinh_gia: "Chưa cấu hình tiền thưởng / số suất / ngưỡng đạt",
   chua_co_du_lieu: "Chưa có dữ liệu",
   du_lieu_dang_xu_ly: "Dữ liệu đang xử lý",

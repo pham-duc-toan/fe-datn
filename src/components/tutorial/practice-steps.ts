@@ -202,9 +202,9 @@ export function buildPracticeSteps(schema: LabelSchema, demo: DemoSample, only: 
       key: "__cau_hoi",
       title: "Đọc câu hỏi trước",
       body:
-        "Dòng nổi bật phía trên mẫu là CÂU HỎI của câu: nó cho biết dự án cần bạn trả lời gì về mẫu này. " +
-        "Mỗi câu trong bài thật đều có câu hỏi — có câu dùng câu hỏi chung của dự án, có câu có câu hỏi riêng.",
-      tip: "Dòng chữ nhỏ dưới tên một công cụ (nếu có) là lưu ý riêng của công cụ đó.",
+        "Mỗi ô công cụ ở cột bên phải có một CÂU HỎI nổi bật: nó cho biết dùng công cụ đó để trả lời gì về mẫu. " +
+        "Đọc câu hỏi của từng công cụ trước khi gán.",
+      tip: "Một số câu có thêm dải “Về mẫu này” ở đầu — đó là ngữ cảnh riêng của mẫu (vd câu hỏi gốc của cặp câu trả lời).",
     },
   ];
 
