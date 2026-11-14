@@ -100,7 +100,7 @@ export default function LabelerProjectPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Câu hỏi của dự án</CardTitle>
-                <CardDescription>Mỗi câu trong bài, bạn trả lời các câu hỏi này bằng công cụ tương ứng (vài câu có thêm ngữ cảnh riêng). Lần đầu gặp công cụ nào, bạn được luyện tập trước khi làm.</CardDescription>
+                <CardDescription>Mỗi câu trong bài, bạn trả lời các câu hỏi này bằng công cụ tương ứng (vài câu có thêm ngữ cảnh riêng). Lần đầu vào trang làm bài, tour hướng dẫn sẽ chỉ cách dùng.</CardDescription>
               </CardHeader>
               <CardContent>
                 <ToolQuestions schema={p.labelSchema} />

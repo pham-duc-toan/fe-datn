@@ -20,6 +20,8 @@ export type WorkspaceProps = {
   schema: LabelSchema;
   modality: Modality;
   fileUrl: string | null;
+  /** Video bản watermark: chữ "nguồn: <người xem> - <doanh nghiệp> - <domain>" vẽ đè góc dưới phải trình phát. */
+  watermarkText?: string | null;
   content: SampleContent | null;
   metadata: SampleMeta;
   /** Ngữ cảnh / câu hỏi riêng của mẫu (tuỳ chọn) — hiện ở đầu câu. Câu hỏi của từng công cụ lấy từ `schema.tools[].question`. */
@@ -32,11 +34,9 @@ export type WorkspaceProps = {
   onMediaError?: () => void;
   /** Gọn cho trang vượt link: chỉ cột công cụ dưới mẫu. */
   stacked?: boolean;
-  /** Màn luyện tập: làm nổi ô công cụ của nhiệm vụ đang làm. */
-  highlightTool?: string;
 };
 
-export function Workspace({ schema, modality, fileUrl, content, metadata, question, value, onChange, readOnly = false, seed, onMediaError, stacked, highlightTool }: WorkspaceProps) {
+export function Workspace({ schema, modality, fileUrl, watermarkText, content, metadata, question, value, onChange, readOnly = false, seed, onMediaError, stacked }: WorkspaceProps) {
   const tools = schema.tools;
   const spatial = tools.filter((t) => isList(t) && t.kind !== "relation");
   const [activeTool, setActiveTool] = useState<string | null>(readOnly ? null : spatial[0]?.name ?? null);
@@ -135,6 +135,7 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, questi
         <MediaView
           kind={modality}
           src={fileUrl}
+          watermarkText={watermarkText}
           meta={metadata}
           segTools={segTools}
           trackTools={trackTools}
@@ -241,7 +242,6 @@ export function Workspace({ schema, modality, fileUrl, content, metadata, questi
         className={cn(
           "rounded-lg border bg-card p-3 transition-shadow",
           activeTool === t.name && "ring-2 ring-primary/40",
-          highlightTool === t.name && "ring-2 ring-amber-400 shadow-[0_0_0_6px_rgb(251_191_36_/_0.25)]",
         )}
       >
         <div className="mb-2 flex items-center justify-between gap-2">

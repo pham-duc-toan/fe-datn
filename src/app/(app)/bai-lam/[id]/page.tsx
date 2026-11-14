@@ -218,6 +218,7 @@ export default function AttemptPage() {
                 schema={a.labelSchema}
                 modality={q.modality}
                 fileUrl={q.fileUrl}
+                watermarkText={q.watermarkText}
                 content={q.content}
                 question={q.question}
                 metadata={q.metadata}

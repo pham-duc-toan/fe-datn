@@ -35,6 +35,7 @@ export function LabelView({ a }: { a: Annotation }) {
           schema={p.labelSchema}
           modality={p.modality}
           fileUrl={a.fileUrl}
+          watermarkText={a.watermarkText}
           content={a.sampleContent}
           question={a.sampleQuestion}
           metadata={a.sampleMetadata}

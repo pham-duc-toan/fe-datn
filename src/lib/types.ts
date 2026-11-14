@@ -253,7 +253,7 @@ export type Sample = {
   ingestState: IngestState;
   /** Lý do khi ingestState = failed. */
   ingestError?: string | null;
-  /** Video: chuẩn bị bản chuẩn để gắn watermark. null = không cần. */
+  /** Video: cắt sẵn các đoạn phát cho người làm (gắn chữ “nguồn: …”). null = không cần. */
   mediaState?: "preparing" | "ready" | "failed" | null;
   mediaError?: string | null;
 };
@@ -327,7 +327,10 @@ export type AttemptQuestion = {
   index: number;
   sampleId: string;
   modality: Modality;
+  /** Ảnh: có chữ "nguồn: …" vẽ sẵn; video: danh sách phát HLS (…/index.m3u8) CHỈ đoạn của mẫu, mốc 0 = đầu mẫu. */
   fileUrl: string | null;
+  /** Video: chữ "nguồn: <người xem> - <doanh nghiệp> - <domain>" vẽ đè lên trình phát. null với loại khác. */
+  watermarkText?: string | null;
   content: SampleContent | null;
   /** Ngữ cảnh / câu hỏi riêng của mẫu (tuỳ chọn). Câu hỏi của từng công cụ nằm trong labelSchema.tools[].question. */
   question: string | null;
@@ -425,6 +428,8 @@ export type Annotation = {
   sampleId: string;
   source: "professional" | "linkGateway";
   fileUrl: string | null;
+  /** Video bản watermark (labeler xem lại nhãn của mình): chữ vẽ đè lên trình phát. */
+  watermarkText?: string | null;
   sampleContent: SampleContent | null;
   /** Ngữ cảnh / câu hỏi riêng của mẫu (tuỳ chọn). */
   sampleQuestion: string | null;

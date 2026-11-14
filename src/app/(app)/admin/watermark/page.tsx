@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/common/page-header";
-import { Field } from "@/components/common/misc";
 import { FilePreview } from "@/components/common/file-preview";
 import { UserName } from "@/components/common/user-name";
 import { api } from "@/lib/api";
@@ -19,30 +18,23 @@ type Res = { found: boolean; confidence: number; mediaType?: string; viewer: { t
 
 export default function WatermarkPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [w, setW] = useState("");
-  const [h, setH] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<Res | null>(null);
   return (
     <>
-      <PageHeader title="Truy người làm lộ dữ liệu" description="Giải watermark chìm trong ảnh / âm thanh / video bị lộ để biết tài khoản nào đã nhận bản đó." />
+      <PageHeader title="Truy người làm lộ dữ liệu" description="Tìm tài khoản đã nhận bản dữ liệu bị lộ ra ngoài." />
       <div className="grid max-w-4xl gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Tải file nghi bị lộ</CardTitle>
-            <CardDescription>Chịu được nén JPEG, đổi độ sáng; không chịu được cắt xén. Ảnh bị thu nhỏ: nhập kích thước gốc của mẫu.</CardDescription>
+            <CardTitle>Tải file âm thanh nghi bị lộ</CardTitle>
+            <CardDescription>
+              Ảnh và video không cần tải lên: góc dưới bên phải mỗi ảnh / video đã có chữ “nguồn: &lt;mã tài khoản&gt; - &lt;doanh nghiệp&gt; - &lt;trang&gt;” — đọc mã tài khoản
+              ngay trên hình. Âm thanh mang dấu ẩn không nghe thấy ở đoạn đầu và đoạn cuối; chịu được nén lại, không chịu được cắt bỏ cả hai đoạn đó.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input type="file" accept="image/*,audio/*,video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Input type="file" accept="audio/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             <FilePreview file={file} className="mt-2" />
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Rộng gốc (px)">
-                <Input type="number" value={w} onChange={(e) => setW(e.target.value)} />
-              </Field>
-              <Field label="Cao gốc (px)">
-                <Input type="number" value={h} onChange={(e) => setH(e.target.value)} />
-              </Field>
-            </div>
             <Button
               disabled={!file || busy}
               onClick={async () => {
@@ -52,8 +44,6 @@ export default function WatermarkPage() {
                 try {
                   const fd = new FormData();
                   fd.append("file", file);
-                  if (w) fd.append("width", w);
-                  if (h) fd.append("height", h);
                   setRes(await api<Res>("/media/admin/watermark/decode", { method: "POST", body: fd }));
                 } catch (e) {
                   toast.error(errorMessage(e));
@@ -70,14 +60,14 @@ export default function WatermarkPage() {
           <Alert variant={res.found ? "default" : "destructive"}>
             <AlertTitle>{res.found ? "Tìm thấy watermark" : "Không tìm thấy watermark"}</AlertTitle>
             <AlertDescription className="space-y-1">
-              <p>Độ tin cậy {formatNumber(res.confidence, 2)} {res.mediaType && `· ${res.mediaType}`}</p>
+              <p>Độ tin cậy {formatNumber(res.confidence, 2)}</p>
               {res.viewer?.userId && (
                 <p>
                   Tài khoản đã nhận bản này: <UserName id={res.viewer.userId} withAvatar /> <code className="text-xs">{res.viewer.userId}</code>
                 </p>
               )}
               {res.viewer?.guestSessionId && <p>Khách vãng lai cổng link — phiên {res.viewer.guestSessionId}</p>}
-              {!res.found && <p>Có thể file không có watermark, bị cắt xén hoặc biến dạng quá mức (~0,5 là ngẫu nhiên).</p>}
+              {!res.found && <p>Có thể file không có dấu ẩn, đã bị cắt bỏ đoạn đầu và đoạn cuối, hoặc bị biến dạng quá mức (~0,5 là ngẫu nhiên).</p>}
             </AlertDescription>
           </Alert>
         )}

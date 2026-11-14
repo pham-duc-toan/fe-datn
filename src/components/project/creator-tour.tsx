@@ -25,7 +25,7 @@ export const CREATOR_TOUR: TourStep[] = [
   {
     target: "cfg-cong-cu",
     title: "Công cụ gán nhãn — mỗi công cụ một câu hỏi",
-    body: "Mỗi công cụ là một cách trả lời (chọn lớp, vẽ khung, bôi đoạn…) và BẮT BUỘC có câu hỏi riêng, viết rõ dùng công cụ đó để trả lời gì (vd “Khoanh tất cả xe trong ảnh”). Labeler thấy câu hỏi nổi bật ngay trên công cụ. Lần đầu gặp công cụ nào, labeler được luyện tập trước.",
+    body: "Mỗi công cụ là một cách trả lời (chọn lớp, vẽ khung, bôi đoạn…) và BẮT BUỘC có câu hỏi riêng, viết rõ dùng công cụ đó để trả lời gì (vd “Khoanh tất cả xe trong ảnh”). Labeler thấy câu hỏi nổi bật ngay trên công cụ.",
   },
   {
     target: "cfg-gia",

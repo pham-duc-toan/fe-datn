@@ -19,7 +19,7 @@ import { formatDateTime } from "@/lib/format";
 import type { LabelData, LabelSchema, SampleContent, SampleMeta } from "@/lib/types";
 import { useProject } from "@/components/project/use-project";
 
-type Attempt = { attemptId: string; expiresAt: string; labelSchema: LabelSchema; questions: { sampleId: string; fileUrl: string | null; content: SampleContent | null; question: string | null; metadata: SampleMeta }[] };
+type Attempt = { attemptId: string; expiresAt: string; labelSchema: LabelSchema; questions: { sampleId: string; fileUrl: string | null; watermarkText?: string | null; content: SampleContent | null; question: string | null; metadata: SampleMeta }[] };
 type Result = { scorePercent: number; passPercent: number; passed: boolean; joinedProject: boolean; joinRequestId: string | null; attemptsLeft: number };
 
 function useCountdown(to: string | null) {
@@ -177,6 +177,7 @@ export default function EntranceTestPage() {
               schema={attempt.labelSchema}
               modality={modality}
               fileUrl={q.fileUrl}
+              watermarkText={q.watermarkText}
               content={q.content}
               question={q.question}
               metadata={q.metadata}

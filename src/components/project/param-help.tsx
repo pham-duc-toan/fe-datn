@@ -30,7 +30,7 @@ export const PARAM_HELP = {
   },
   tools: {
     effect: "Quyết định labeler trả lời bằng cách nào (chọn lớp, vẽ khung, bôi đoạn…) và bài được chấm theo đa số của từng công cụ.",
-    shows: "Cột công cụ bên phải mẫu. Lần đầu gặp một loại công cụ, labeler được luyện tập trên câu ví dụ trước khi làm.",
+    shows: "Cột công cụ bên phải mẫu ở mỗi câu trong bài.",
   },
   requiredTool: {
     effect: "Bật thì câu nào cũng phải có câu trả lời của công cụ này mới hợp lệ.",

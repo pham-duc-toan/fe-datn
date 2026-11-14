@@ -25,8 +25,8 @@ function tim(target: string): HTMLElement | null {
 export function SpotlightTour({ steps, onClose, finishLabel = "Bắt đầu làm bài" }: { steps: TourStep[]; onClose: (finished: boolean) => void; finishLabel?: string }) {
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
-  // Điểm dừng có phần tử thật trên trang. Phải đo SAU khi trang được dựng (tour có thể mở cùng lúc trang đổi từ màn
-  // luyện tập sang trang làm bài, lúc render DOM chưa có phần tử nào) nên đo ở khung hình kế tiếp; null = chưa đo.
+  // Điểm dừng có phần tử thật trên trang. Phải đo SAU khi trang được dựng (tour có thể mở ngay lúc trang vừa tải xong,
+  // lúc render DOM chưa có phần tử nào) nên đo ở khung hình kế tiếp; null = chưa đo.
   const [conThat, setConThat] = useState<TourStep[] | null>(null);
   const coThat = conThat ?? [];
   const step = coThat[i];

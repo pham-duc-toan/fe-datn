@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 import { Stage, Layer, Rect, Text } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Pause, Play, StepBack, StepForward, Flag, FlagOff, Loader2 } from "lucide-react";
@@ -11,7 +12,10 @@ import { classColor, interpolateTrack, round2, type SegmentObj, type TrackObj, t
 
 type Props = {
   kind: "audio" | "video";
+  /** File nguyên (bản gốc / âm thanh) hoặc danh sách phát HLS ".../index.m3u8" (video bản watermark, chỉ đoạn của mẫu). */
   src: string;
+  /** Video bản watermark: chữ "nguồn: <người xem> - <doanh nghiệp> - <domain>" vẽ đè góc dưới phải. */
+  watermarkText?: string | null;
   meta: SampleMeta;
   segTools: Tool[];
   trackTools: Tool[];
@@ -28,8 +32,13 @@ type Props = {
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export default function MediaView(p: Props) {
-  const { kind, src, meta, segTools, trackTools, data, activeTool, activeClass, selected, readOnly, onChange, onSelect, onError } = p;
+  const { kind, src, watermarkText, meta, segTools, trackTools, data, activeTool, activeClass, selected, readOnly, onChange, onSelect, onError } = p;
   const mediaRef = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  // Lỗi phát HLS báo qua ref: đổi hàm onError không làm dựng lại trình phát.
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
   const boxRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const [t, setT] = useState(0);
@@ -41,8 +50,10 @@ export default function MediaView(p: Props) {
   const [pendingStart, setPendingStart] = useState<number | null>(null);
   const [draw, setDraw] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
 
-  // Mẫu có thể là MỘT đoạn cắt từ file dài: fileUrl là cả file, mốc 0 = segmentStart (mục 6.4).
-  const s0 = meta.segmentStart ?? 0;
+  // Mẫu có thể là MỘT đoạn cắt từ file dài. File nguyên (bản gốc): mốc 0 = segmentStart (mục 6.4). Danh sách phát
+  // HLS (bản watermark của người làm): media-svc chỉ phát đúng đoạn của mẫu, mốc 0 = đầu mẫu.
+  const isHls = /\.m3u8(\?|$)/.test(src);
+  const s0 = isHls ? 0 : meta.segmentStart ?? 0;
   const dur = meta.durationSec ?? (meta.segmentEnd !== undefined ? meta.segmentEnd - s0 : mediaDur !== null ? mediaDur - s0 : 0);
   const s1 = s0 + dur;
   const W = meta.width ?? 1280;
@@ -81,6 +92,30 @@ export default function MediaView(p: Props) {
       el.removeEventListener("pause", onPause);
     };
   }, [s0, s1, dur]);
+
+  // HLS: Safari phát gốc; trình duyệt khác dùng hls.js (Media Source Extensions).
+  useEffect(() => {
+    const el = mediaRef.current;
+    if (!el || !isHls) return;
+    if (el.canPlayType("application/vnd.apple.mpegurl")) {
+      el.src = src;
+      return;
+    }
+    if (!Hls.isSupported()) {
+      onErrorRef.current?.();
+      return;
+    }
+    const hls = new Hls();
+    hls.on(Hls.Events.ERROR, (_e, d) => {
+      if (d.fatal) {
+        hls.destroy();
+        onErrorRef.current?.();
+      }
+    });
+    hls.loadSource(src);
+    hls.attachMedia(el);
+    return () => hls.destroy();
+  }, [src, isHls]);
 
   useEffect(() => {
     if (kind !== "video" || !boxRef.current) return;
@@ -151,7 +186,7 @@ export default function MediaView(p: Props) {
     <div className="space-y-3">
       {kind === "video" ? (
         <div ref={boxRef} className="relative w-full overflow-hidden rounded-md bg-black" style={{ aspectRatio: `${W} / ${H}` }}>
-          <video ref={mediaRef} src={src} className="absolute inset-0 h-full w-full" preload="auto" onError={onError} playsInline />
+          <video ref={mediaRef} src={isHls ? undefined : src} className="absolute inset-0 h-full w-full" preload="auto" onError={onError} playsInline />
           {trackTools.length > 0 && (
             <div className="absolute inset-0">
               <Stage
@@ -231,6 +266,17 @@ export default function MediaView(p: Props) {
                   )}
                 </Layer>
               </Stage>
+            </div>
+          )}
+          {watermarkText && (
+            // Phần giữa video mang chữ chung (doanh nghiệp + domain) in sẵn ở góc dưới phải; lớp này ngay phía trên,
+            // mang cả mã người xem — quay màn hình vẫn thấy. Không chặn chuột (vẽ khung vẫn bình thường).
+            <div
+              aria-hidden
+              className="pointer-events-none absolute right-[2%] max-w-[96%] truncate text-white/60 select-none [text-shadow:0_0_2px_rgb(0_0_0/0.9)]"
+              style={{ bottom: box.h * 0.065, fontSize: clamp(box.h * 0.03, 10, 16) }}
+            >
+              {watermarkText}
             </div>
           )}
           {!ready && (

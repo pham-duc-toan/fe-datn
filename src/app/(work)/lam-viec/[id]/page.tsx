@@ -13,9 +13,8 @@ import { PageHeader } from "@/components/common/page-header";
 import { ActionDialog } from "@/components/common/action-dialog";
 import { ErrorState, Loading } from "@/components/common/states";
 import { Workspace } from "@/components/labeling/workspace";
-import { PracticeSession } from "@/components/tutorial/practice-session";
 import { SpotlightTour, type TourStep } from "@/components/tutorial/spotlight-tour";
-import { markLearned, markTourDone, readTutorial, unlearnedKinds } from "@/components/tutorial/tutorial-store";
+import { markTourDone, readTutorial } from "@/components/tutorial/tutorial-store";
 import { buildPayload, initialData, isBlank, validateLabel } from "@/components/labeling/schema";
 import { useProject } from "@/components/project/use-project";
 import { hasFreeText, schemaToolKinds } from "@/components/project/free-text-notice";
@@ -26,7 +25,7 @@ import { deviceId } from "@/lib/device";
 import { formatVnd } from "@/lib/format";
 import { REPORT_REASON } from "@/lib/labels";
 import { cn } from "@/lib/utils";
-import type { Attempt, InvalidAnswer, LabelData, SubmitAttemptResponse, ToolKind } from "@/lib/types";
+import type { Attempt, InvalidAnswer, LabelData, SubmitAttemptResponse } from "@/lib/types";
 
 /** Đếm ngược tới hạn nộp của bài. */
 function Countdown({ to }: { to: string }) {
@@ -58,11 +57,11 @@ function answeredSet(a: Attempt, local: Answers): Set<string> {
 
 const FLAG_KEY = (aid: string) => `crowd:attempt-flags:${aid}`;
 
-/** Tour giới thiệu trang làm bài (sau màn luyện tập) — mỗi điểm dừng là một phần tử `data-tour`. */
+/** Tour giới thiệu trang làm bài và công cụ (tự mở lần đầu) — mỗi điểm dừng là một phần tử `data-tour`. */
 const TOUR: TourStep[] = [
   { target: "danh-sach-cau", title: "Danh sách câu hỏi", body: "Bấm số để nhảy tới câu bất kỳ, làm theo thứ tự tuỳ ý. Ô xanh là câu đã trả lời, chấm vàng là câu bạn đánh dấu xem lại, viền đỏ là câu chưa hợp lệ." },
   { target: "cau-hoi", title: "Câu hỏi của công cụ", body: "Mỗi công cụ có câu hỏi riêng, hiện nổi bật trên ô công cụ: đọc trước khi gán để biết dùng công cụ đó trả lời gì. Câu nào có dải “Về mẫu này” ở đầu thì đó là ngữ cảnh riêng của mẫu." },
-  { target: "khu-gan-nhan", title: "Khu gán nhãn", body: "Mẫu ở bên trái, các công cụ ở bên phải — giống hệt bài luyện tập vừa rồi." },
+  { target: "khu-gan-nhan", title: "Khu gán nhãn", body: "Mẫu ở bên trái, các công cụ ở bên phải. Chọn lớp trên ô công cụ rồi gán lên mẫu; công cụ vẽ (khung, đa giác, điểm…) thì kéo / bấm trực tiếp trên mẫu." },
   { target: "danh-dau", title: "Đánh dấu xem lại", body: "Chưa chắc câu nào thì đánh dấu để quay lại sau." },
   { target: "bao-loi", title: "Báo lỗi câu", body: "Mẫu hỏng (không xem được, sai nội dung…) thì báo lỗi. Không bị trừ uy tín; câu bị báo sai nhiều sẽ được loại khỏi chấm." },
   { target: "luu-nhap", title: "Nháp lưu trên máy", body: "Mọi câu trả lời tự lưu nháp ngay trên trình duyệt này. Đổi máy hoặc xoá dữ liệu trình duyệt thì mất nháp." },
@@ -86,8 +85,7 @@ export default function ExamPage() {
   const [storageBlocked, setStorageBlocked] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
-  // Hướng dẫn kiểu game: màn luyện tập (only = loại công cụ cần dạy, null = tất cả) rồi tour trang làm bài.
-  const [practice, setPractice] = useState<{ only: ToolKind[] | null; replay: boolean } | null>(null);
+  // Tour hướng dẫn trang làm bài: tự mở lần đầu, nút "Xem lại hướng dẫn" mở lại.
   const [tourOpen, setTourOpen] = useState(false);
 
   // Chặn gọi "bắt đầu" hai lần cùng lúc (effect chạy lại / bấm thử lại khi đang tải).
@@ -127,12 +125,8 @@ export default function ExamPage() {
       }
       const firstBlank = a.questions.findIndex((q) => isBlank(a.labelSchema, restored[q.sampleId] ?? {}));
       setIdx(firstBlank >= 0 ? firstBlank : 0);
-      // Lần đầu gặp công cụ nào thì luyện công cụ đó; đã học hết mà chưa xem tour thì chỉ xem tour.
-      if (a.state === "inProgress") {
-        const chuaHoc = unlearnedKinds(a.labelSchema.tools.map((t) => t.kind));
-        if (chuaHoc.length > 0) setPractice({ only: chuaHoc, replay: false });
-        else if (!readTutorial().tourDone) setTourOpen(true);
-      }
+      // Chưa xem tour trên trình duyệt này thì mở tour.
+      if (a.state === "inProgress" && !readTutorial().tourDone) setTourOpen(true);
     } catch (e) {
       setError(e);
     } finally {
@@ -229,22 +223,6 @@ export default function ExamPage() {
     })();
   }, [attempt]);
 
-  /** Xong màn luyện tập: hoàn thành → sang tour; bỏ qua → bỏ cả hướng dẫn (như "Skip tutorial" trong game). */
-  const practiceDone = useCallback(
-    (finished: boolean) => {
-      if (!attempt) return;
-      markLearned(attempt.labelSchema.tools.map((t) => t.kind));
-      const replay = practice?.replay === true;
-      setPractice(null);
-      if (!finished) {
-        markTourDone();
-        return;
-      }
-      if (replay || !readTutorial().tourDone) setTourOpen(true);
-    },
-    [attempt, practice],
-  );
-
   const tourDone = useCallback(() => {
     markTourDone();
     setTourOpen(false);
@@ -276,14 +254,6 @@ export default function ExamPage() {
   }
   if (!attempt) return <Loading label="Đang mở bài làm…" />;
 
-  if (practice)
-    return (
-      <>
-        <PageHeader back={back} title={p?.name ?? "Làm bài"} description="Luyện tập trên câu ví dụ trước khi vào bài thật" actions={<Countdown to={attempt.expiresAt} />} />
-        <PracticeSession schema={attempt.labelSchema} only={practice.only} onDone={practiceDone} />
-      </>
-    );
-
   const q = attempt.questions[idx];
   const value = answers[q.sampleId] ?? {};
   const hints = touched.has(q.sampleId) ? validateLabel(attempt.labelSchema, value, q.metadata) : [];
@@ -306,7 +276,7 @@ export default function ExamPage() {
         actions={
           <>
             <Countdown to={attempt.expiresAt} />
-            <Button variant="ghost" size="sm" onClick={() => setPractice({ only: null, replay: true })} title="Luyện tập lại các công cụ và xem tour trang làm bài">
+            <Button variant="ghost" size="sm" onClick={() => setTourOpen(true)} title="Xem lại tour hướng dẫn trang làm bài">
               <GraduationCap /> Xem lại hướng dẫn
             </Button>
           </>
@@ -390,6 +360,7 @@ export default function ExamPage() {
               schema={attempt.labelSchema}
               modality={q.modality}
               fileUrl={q.fileUrl}
+              watermarkText={q.watermarkText}
               content={q.content}
               question={q.question}
               metadata={q.metadata}
