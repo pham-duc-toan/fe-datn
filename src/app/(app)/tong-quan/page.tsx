@@ -15,8 +15,8 @@ import { Loading } from "@/components/common/states";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api } from "@/lib/api";
 import { daysAgo, formatDateTime, formatVnd } from "@/lib/format";
-import { kybStatus, MODALITY_LABEL, projectStatus } from "@/lib/labels";
-import type { AttemptSummary, Balance, KybProfile, LevelInfo, Paged, ProjectListItem } from "@/lib/types";
+import { FEED_REASON_LABEL, kybStatus, MODALITY_LABEL, projectStatus } from "@/lib/labels";
+import type { AttemptSummary, Balance, FeedPage, KybProfile, LevelInfo, Paged, ProjectListItem } from "@/lib/types";
 import { ProjectName } from "@/components/labeling/label-view";
 
 function BusinessHome() {
@@ -91,9 +91,12 @@ function LabelerHome() {
   const level = useQuery({ queryKey: ["level"], queryFn: () => api<LevelInfo>("/me/level") });
   const bal = useQuery({ queryKey: ["balance"], queryFn: () => api<Balance>("/ledger/me/balance") });
   const attempts = useQuery({ queryKey: ["my-attempts"], queryFn: () => api<AttemptSummary[]>("/tasks/me/attempts") });
+  // Gợi ý = trang đầu của feed (reco-svc, kiến trúc 3.39). Bộ gợi ý lỗi thì thẻ này để trống, không chặn trang.
   const rec = useQuery({
-    queryKey: ["recommended"],
-    queryFn: () => api<{ id: string; name: string; modality: string; rewardVnd: number; questionCount: number; score: number; reasons: string[] }[]>("/projects/recommended", { query: { limit: 5 } }),
+    queryKey: ["feed-home"],
+    queryFn: () => api<FeedPage>("/projects/feed", { query: { pageSize: 5 } }),
+    staleTime: 5 * 60_000,
+    retry: false,
   });
   const dangLam = (attempts.data ?? []).filter((a) => a.state === "inProgress");
   const lv = level.data;
@@ -152,7 +155,7 @@ function LabelerHome() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Gợi ý cho bạn</CardTitle>
-              <CardDescription>Theo hồ sơ kỹ năng.</CardDescription>
+              <CardDescription>Theo khả năng kiếm tiền và việc bạn hay làm.</CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
               <Link href="/cho">
@@ -161,16 +164,21 @@ function LabelerHome() {
             </Button>
           </CardHeader>
           <CardContent>
-            {(rec.data ?? []).length === 0 ? (
+            {(rec.data?.items ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Chưa có gợi ý. Cập nhật <Link href="/tai-khoan/ho-so" className="text-primary underline">kỹ năng</Link> để nhận gợi ý tốt hơn.
+                Chưa có gợi ý. Bộ gợi ý học dần từ những dự án bạn mở và làm.
               </p>
             ) : (
               <div className="divide-y">
-                {rec.data!.map((p) => (
-                  <Link key={p.id} href={`/cho/${p.id}`} className="flex items-center justify-between py-2 text-sm hover:bg-muted/50">
-                    <span className="truncate">{p.name}</span>
-                    <span className="text-muted-foreground">{formatVnd(p.rewardVnd)} · {p.questionCount} câu</span>
+                {rec.data!.items.map((p) => (
+                  <Link key={p.id} href={`/cho/${p.id}`} className="flex items-center justify-between gap-2 py-2 text-sm hover:bg-muted/50">
+                    <span className="min-w-0">
+                      <span className="block truncate">{p.name}</span>
+                      {p.reasons.length > 0 && (
+                        <span className="block truncate text-xs text-muted-foreground">{p.reasons.map((r) => FEED_REASON_LABEL[r] ?? r).join(" · ")}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground">{formatVnd(p.rewardVnd)} · ~{p.estimatedMinutes} phút</span>
                   </Link>
                 ))}
               </div>

@@ -29,7 +29,7 @@ function KetQua({ a }: { a: AttemptSummary }) {
       <ToneBadge tone={dat ? "success" : "danger"}>{dat ? "Đạt" : "Chưa đạt"}</ToneBadge>
       {a.agreementPercent !== null && <span className="text-xs text-muted-foreground">{a.agreementPercent}% / cần {a.passThresholdPercent}%</span>}
       {dat && a.rewarded !== false && <span className="text-xs text-emerald-700">+{formatVnd(a.rewardVnd)}</span>}
-      {dat && a.rewarded === false && <span className="text-xs text-amber-700">hết suất thưởng</span>}
+      {dat && a.rewarded === false && <span className="text-xs text-amber-700">chưa lọt suất thưởng</span>}
       {!dat && a.rewarded === true && <span className="text-xs text-emerald-700">+{formatVnd(a.rewardVnd)} (lấp suất trống)</span>}
     </span>
   );

@@ -16,11 +16,11 @@ import { Field } from "@/components/common/misc";
 import { SpotlightTour } from "@/components/tutorial/spotlight-tour";
 import { markCreatorTourDone, readTutorial } from "@/components/tutorial/tutorial-store";
 import { TagPicker } from "@/components/common/tag-picker";
-import { api, patch } from "@/lib/api";
+import { api, patch, put } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatVnd } from "@/lib/format";
-import { TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
-import type { LabelSchema, Project, Readiness, ToolKind, Visibility } from "@/lib/types";
+import { PREVIEW_BLOCK_REASON, TOOL_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
+import type { LabelSchema, PreviewSetting, Project, Readiness, ToolKind, Visibility } from "@/lib/types";
 import { CREATOR_TOUR } from "./creator-tour";
 import { LabelerPreview } from "./labeler-preview";
 import { HelpTip, type ParamKey } from "./param-help";
@@ -62,6 +62,11 @@ function toLocal(iso: string | null): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+/** Giá trị `max` cho ô hạn chót: hôm nay + n ngày (project.max_duration_days), theo giờ máy người dùng. */
+function hanToiDa(soNgay: number): string {
+  return toLocal(new Date(Date.now() + soNgay * 86400000).toISOString());
+}
+
 function SaveCard({ title, description, children, onSave, disabled, note, tour }: { title: ReactNode; description?: ReactNode; children: ReactNode; onSave: () => Promise<unknown>; disabled?: boolean; note?: ReactNode; tour?: string }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -91,6 +96,45 @@ function SaveCard({ title, description, children, onSave, disabled, note, tour }
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Bật / tắt mẫu xem trước trên thẻ chợ dự án (P1, kiến trúc 3.39) — lưu NGAY khi gạt (không theo nút Lưu của thẻ), đổi
+ * được cả khi dự án đang chạy. Hệ thống tự lấy 1 mẫu thật; câu hỏi + công cụ luôn hiện.
+ */
+function XemTruocTrenCho({ p }: { p: Project }) {
+  const setProject = useSetProject(p.id);
+  const [busy, setBusy] = useState(false);
+  const closed = p.status === "completed" || p.status === "cancelled";
+  const chan = p.previewBlockedReason;
+  return (
+    <div className="space-y-1.5 border-t pt-4">
+      <label className="flex items-center gap-2 text-sm">
+        <Switch
+          checked={p.previewEnabled && !chan}
+          disabled={busy || closed || Boolean(chan)}
+          onCheckedChange={async (v) => {
+            setBusy(true);
+            try {
+              const r = await put<PreviewSetting>(`/projects/${p.id}/preview`, { enabled: v });
+              setProject({ ...p, previewEnabled: r.enabled, previewBlockedReason: r.blockedReason });
+              toast.success(r.enabled ? "Đã bật xem trước trên chợ dự án" : "Đã tắt xem trước trên chợ dự án");
+            } catch (e) {
+              toast.error(errorMessage(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+        Cho labeler xem trước 1 mẫu trên chợ dự án
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Hệ thống tự lấy 1 mẫu thật (không phải câu kiểm tra), có watermark người xem. Câu hỏi và công cụ của bài luôn hiện trên thẻ.
+        Gạt là lưu ngay, đổi được cả khi dự án đang chạy.
+      </p>
+      {chan && <p className="text-xs text-amber-700 dark:text-amber-400">{PREVIEW_BLOCK_REASON[chan] ?? "Dự án này không cho xem trước mẫu."}</p>}
+    </div>
   );
 }
 
@@ -225,7 +269,7 @@ export function ConfigTab({ project: p }: { project: Project }) {
       <SaveCard
         title="Tiền thưởng, số suất, ngưỡng đạt"
         tour="cfg-gia"
-        description="Tiền tính cho CẢ DỰ ÁN: mỗi labeler làm hết các câu rồi nộp một bài. Bài đạt = giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra. Mỗi suất thưởng trao cho một bài đạt, theo thứ tự nộp sớm nhất; số người được làm nhiều hơn số suất để đa số chắc hơn."
+        description="Tiền tính cho CẢ DỰ ÁN: mỗi labeler làm hết các câu rồi nộp một bài. Bài đạt = giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra. Không giới hạn số người làm: thu bài tới hạn chót (hoặc khi bạn kết thúc sớm), mỗi suất thưởng trao cho một bài đạt giống đa số nhất."
         disabled={!draft}
         onSave={() =>
           save("pricing", {
@@ -256,14 +300,22 @@ export function ConfigTab({ project: p }: { project: Project }) {
             label={<L k="slots">Số suất thưởng</L>}
             hint={
               lim
-                ? `${lim.minSlots}–${lim.maxSlots} người được thưởng (n bài đạt nộp sớm nhất). Tối đa ${slots ? slots * lim.participantMultiplier : `n × ${lim.participantMultiplier}`} người được làm bài.`
-                : "Số bài đạt nộp sớm nhất được thưởng"
+                ? `${lim.minSlots}–${lim.maxSlots} người được thưởng (n bài đạt giống đa số nhất). Số người làm bài không giới hạn.`
+                : "Số bài đạt giống đa số nhất được thưởng"
             }
           >
             <Input type="number" min={lim?.minSlots ?? 1} max={lim?.maxSlots ?? 50} value={price.slots} onChange={(e) => setPrice({ ...price, slots: e.target.value })} />
           </Field>
-          <Field label={<L k="deadline">Hạn chót</L>}>
-            <Input type="datetime-local" value={price.deadline} onChange={(e) => setPrice({ ...price, deadline: e.target.value })} />
+          <Field
+            label={<L k="deadline">Hạn chót</L>}
+            hint={lim && lim.maxDurationDays > 0 ? `Bắt buộc, tối đa ${lim.maxDurationDays} ngày kể từ hôm nay — thu bài đóng khi tới hạn` : "Bắt buộc — thu bài đóng khi tới hạn"}
+          >
+            <Input
+              type="datetime-local"
+              value={price.deadline}
+              max={lim && lim.maxDurationDays > 0 ? hanToiDa(lim.maxDurationDays) : undefined}
+              onChange={(e) => setPrice({ ...price, deadline: e.target.value })}
+            />
           </Field>
         </div>
         <Field label={<L k="passThreshold">{`Ngưỡng đạt t = ${t}%`}</L>} hint={`Tỉ lệ câu của bài giống đa số tối thiểu để được thưởng. Quản trị viên cho phép trong khoảng ${tMin}%–${tMax}%.`}>
@@ -409,12 +461,13 @@ export function ConfigTab({ project: p }: { project: Project }) {
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={prot.requireVerifiedIdentity} onCheckedChange={(v) => setProt({ ...prot, requireVerifiedIdentity: v })} /> Chỉ nhận người đã xác minh danh tính <HelpTip k="verifiedIdentity" />
         </label>
+        <XemTruocTrenCho p={p} />
       </SaveCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SaveCard
           title={<L k="tags">Chủ đề (để gợi ý labeler)</L>}
-          description="Labeler có thẻ trùng với dự án sẽ thấy dự án trong mục gợi ý."
+          description="Bộ gợi ý dùng chủ đề để đưa dự án tới labeler hay làm việc cùng loại."
           onSave={() => save("tags", { domains: tags.domains, languages: tags.languages })}
         >
           <Field label="Lĩnh vực">

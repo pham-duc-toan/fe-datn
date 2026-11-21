@@ -49,11 +49,11 @@ export const PARAM_HELP = {
     shows: "Số tiền nổi bật trên thẻ dự án ở chợ và dòng “Thưởng … nếu đạt” ở đầu trang làm bài.",
   },
   slots: {
-    effect: "Số bài đạt được trả thưởng, theo thứ tự nộp sớm nhất. Số người được làm nhiều hơn số suất (theo hệ số của nền tảng) để đa số chắc hơn — người làm thêm không tốn thêm tiền.",
+    effect: "Số bài đạt được trả thưởng: các bài đạt giống đa số nhất (bằng nhau thì bài nộp sớm hơn). Không giới hạn số người làm — càng nhiều người đa số càng chắc, người làm thêm không tốn thêm tiền.",
     shows: "“… suất” trên thẻ dự án ở chợ.",
   },
   deadline: {
-    effect: "Hết hạn thì dự án tự đóng thu bài và chấm. Mỗi bài có hạn làm riêng, không quá hạn chót của dự án.",
+    effect: "Bắt buộc, có giới hạn số ngày tối đa của nền tảng. Không giới hạn người làm nên dự án chỉ đóng thu bài khi tới hạn chót (hoặc bạn kết thúc sớm), rồi chấm. Mỗi bài có hạn làm riêng, không quá hạn chót của dự án.",
     shows: "Hạn chót ở chợ; đồng hồ đếm ngược ở trang làm bài.",
   },
   passThreshold: {

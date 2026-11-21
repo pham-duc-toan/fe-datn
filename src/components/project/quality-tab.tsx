@@ -154,7 +154,7 @@ export function QualityTab({ project: p }: { project: Project }) {
                         ) : (
                           <span className="flex flex-wrap gap-1">
                             <ToneBadge tone={l.passed ? "success" : "danger"}>{l.passed ? "Đạt" : "Chưa đạt"}</ToneBadge>
-                            {l.passed && l.rewarded === false && <ToneBadge tone="warning">hết suất thưởng</ToneBadge>}
+                            {l.passed && l.rewarded === false && <ToneBadge tone="warning">ngoài suất thưởng</ToneBadge>}
                             {!l.passed && l.rewarded === true && <ToneBadge tone="info">được thưởng (lấp suất)</ToneBadge>}
                           </span>
                         )}

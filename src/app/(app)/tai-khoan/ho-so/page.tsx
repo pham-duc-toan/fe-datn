@@ -5,19 +5,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/common/page-header";
 import { Field } from "@/components/common/misc";
-import { TagPicker } from "@/components/common/tag-picker";
 import { Loading } from "@/components/common/states";
 import { api, post, put, uploadToSignedUrl } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import { MODALITY_LABEL, ROLE_LABEL } from "@/lib/labels";
-import type { Modality, Profile } from "@/lib/types";
+import { ROLE_LABEL } from "@/lib/labels";
+import type { Profile } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { usernameError } from "@/lib/tool-names";
 
@@ -33,9 +31,6 @@ function ProfileForm({ p }: { p: Profile }) {
   const [username, setUsername] = useState(p.username ?? "");
   const usernameErr = username !== p.username ? usernameError(username) : null;
   const [bio, setBio] = useState(p.bio ?? "");
-  const [domains, setDomains] = useState<string[]>(p.skills.domains ?? []);
-  const [languages, setLanguages] = useState<string[]>(p.skills.languages ?? []);
-  const [mods, setMods] = useState<string[]>(p.skills.modalities ?? []);
   const [busy, setBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -107,37 +102,6 @@ function ProfileForm({ p }: { p: Profile }) {
               </Field>
               <Button onClick={() => void run("info", () => put<Profile>("/me/profile", { displayName: name, bio: bio || null, username: username.replace(/^@/, "") }), "Đã lưu hồ sơ")} disabled={busy === "info" || Boolean(usernameErr)}>
                 {busy === "info" && <Loader2 className="animate-spin" />} Lưu
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Hồ sơ kỹ năng</CardTitle>
-              <CardDescription>Dự án được gợi ý theo số thẻ lĩnh vực / ngôn ngữ trùng với dự án và loại dữ liệu bạn quen làm.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Field label="Lĩnh vực am hiểu">
-                <TagPicker kind="domain" value={domains} onChange={setDomains} max={20} />
-              </Field>
-              <Field label="Ngôn ngữ thành thạo">
-                <TagPicker kind="language" value={languages} onChange={setLanguages} max={20} />
-              </Field>
-              <div className="space-y-2">
-                <span className="text-sm font-medium">Loại dữ liệu quen làm</span>
-                <div className="flex flex-wrap gap-3">
-                  {(Object.keys(MODALITY_LABEL) as Modality[]).map((m) => (
-                    <label key={m} className="flex items-center gap-1.5 text-sm">
-                      <Checkbox checked={mods.includes(m)} onCheckedChange={(c) => setMods((cur) => (c === true ? cur.concat([m]) : cur.filter((x) => x !== m)))} />
-                      {MODALITY_LABEL[m]}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <Button
-                onClick={() => void run("skills", () => put<Profile>("/me/skills", { domains, languages, modalities: mods }), "Đã lưu kỹ năng")}
-                disabled={busy === "skills"}
-              >
-                {busy === "skills" && <Loader2 className="animate-spin" />} Lưu kỹ năng
               </Button>
             </CardContent>
           </Card>

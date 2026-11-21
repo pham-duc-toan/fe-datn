@@ -53,6 +53,23 @@ export const TOOLS_BY_MODALITY: Record<Modality, ToolKind[]> = {
 };
 
 /** Dạng gán nhãn của dự án (mỗi loại công cụ một lần), vd "Phân loại · Khung chữ nhật". */
+/** Lý do bộ gợi ý đưa thẻ lên (feed reco-svc, kiến trúc 3.39). */
+export const FEED_REASON_LABEL: Record<string, string> = {
+  kiem_tot: "Kiếm tốt",
+  hop_so_thich: "Hợp với việc bạn hay làm",
+  hay_dat: "Bạn hay đạt dạng này",
+  lam_nhanh: "Làm nhanh",
+  moi: "Mới mở",
+  kham_pha: "Thử loại mới",
+};
+
+/** Lý do không cho bật mẫu xem trước (GET /projects/{id}/preview-samples). */
+export const PREVIEW_BLOCK_REASON: Record<string, string> = {
+  xem_truoc_khi_co_nda: "Dự án có NDA nên không cho xem trước mẫu.",
+  xem_truoc_noi_dung_nhay_cam: "Dự án có nội dung nhạy cảm nên không cho xem trước mẫu.",
+  xem_truoc_du_an_rieng_tu: "Dự án riêng tư không hiện ở chợ nên không cần mẫu xem trước.",
+};
+
 export function toolKindsText(kinds: ToolKind[] | null | undefined): string {
   return (kinds ?? []).map((k) => TOOL_LABEL[k] ?? k).join(" · ");
 }
@@ -116,7 +133,6 @@ export const phaseOf = (s: string | null | undefined, freeText: boolean) =>
   s === "finished" && freeText ? PHASE_ANALYZING : projectPhase(s);
 
 export const FINISH_REASON: Record<string, string> = {
-  du_suat: "đủ suất",
   het_han: "hết hạn chót",
   ket_thuc_som: "chủ dự án kết thúc sớm",
 };
@@ -198,6 +214,7 @@ export const READINESS_LABEL: Record<string, string> = {
   du_lieu_dang_xu_ly: "Dữ liệu đang xử lý",
   video_dang_chuan_bi: "Video đang được chuẩn bị (mã hoá lại để gắn watermark) — chờ xong mới publish được",
   deadline_da_qua: "Hạn chót đã qua",
+  han_chot_qua_xa: "Hạn chót xa hơn mức tối đa cho phép — đặt lại hạn chót ở tab Cấu hình",
   thieu_cau_hoi_vang_cho_test: "Thiếu câu vàng cho bài test đầu vào",
   thuong_duoi_toi_thieu: "Tiền thưởng mỗi suất dưới mức tối thiểu",
   so_suat_khong_hop_le: "Số suất nằm ngoài giới hạn",

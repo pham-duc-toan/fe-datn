@@ -55,6 +55,7 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
     // Còn file đang xử lý (nạp mẫu, chuẩn bị video): tự cập nhật tới khi xong.
     refetchInterval: readinessRefetch,
   });
+  const [bayGio] = useState(() => Date.now());
   const progress = useQuery({ queryKey: ["progress", p.id], queryFn: () => api<ProgressT>(`/tasks/projects/${p.id}/progress`), enabled: Boolean(published), refetchInterval: 20000 });
   // Bài đạt (kể cả khiếu nại được chấp nhận) — có ngay khi chấm xong, trước khi dự án chốt.
   const attempts = useQuery({
@@ -89,9 +90,12 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
   }
 
   const pr = progress.data;
-  // Trần người làm (bản chụp cũ không có → số suất).
-  const cap = pr ? pr.maxParticipants || pr.slots : 0;
-  const done = pr ? Math.round((pr.submitted / Math.max(1, cap)) * 100) : 0;
+  // Không giới hạn người làm (kiến trúc 3.38): thanh tiến độ là thời gian đã trôi từ lúc chạy tới hạn chót.
+  // Lấy giờ một lần lúc mở tab (render phải thuần); tiến độ làm mới theo lượt tải lại dữ liệu là đủ.
+  const batDau = p.publishedAt ? new Date(p.publishedAt).getTime() : NaN;
+  const hetHan = pr?.deadline ? new Date(pr.deadline).getTime() : NaN;
+  const done =
+    pr && pr.phase !== "open" ? 100 : Number.isFinite(batDau) && Number.isFinite(hetHan) && hetHan > batDau ? Math.min(100, Math.max(0, Math.round(((bayGio - batDau) / (hetHan - batDau)) * 100))) : 0;
   const r = readiness.data;
 
   return (
@@ -144,12 +148,12 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
         <>
           {hasFreeText(p.toolKinds) && !pr?.gradedAt && <FreeTextNotice audience={pr?.phase === "finished" ? "pending" : "business"} />}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Bài đã nộp" value={pr ? `${pr.submitted}/${cap}` : "—"} hint={pr ? `${done}% trần người làm · ${pr.slots} suất thưởng` : undefined} />
+            <StatCard label="Bài đã nộp" value={pr?.submitted ?? "—"} hint={pr ? `${pr.slots} suất thưởng · không giới hạn người làm` : undefined} />
             <StatCard label="Đang làm" value={pr?.inProgress ?? "—"} hint={pr ? `${pr.expired} hết giờ · ${pr.cancelled} bỏ` : undefined} />
             <StatCard
               label="Giai đoạn"
               value={pr ? <StatusBadge entry={phaseOf(pr.phase, hasFreeText(p.toolKinds))} /> : "—"}
-              hint={pr?.finishReason ? `đóng thu bài vì ${FINISH_REASON[pr.finishReason] ?? pr.finishReason}` : pr?.estimatedCompletionAt ? `dự kiến đủ suất ${formatDateTime(pr.estimatedCompletionAt)}` : undefined}
+              hint={pr?.finishReason ? `đóng thu bài vì ${FINISH_REASON[pr.finishReason] ?? pr.finishReason}` : pr?.estimatedCompletionAt ? `đóng thu bài lúc hạn chót ${formatDateTime(pr.estimatedCompletionAt)}` : undefined}
             />
             <StatCard
               label="Bài đạt"
@@ -157,7 +161,12 @@ export function OverviewTab({ project: p, onTab }: { project: Project; onTab: (t
               hint={pr?.appealDeadline && !pr.settledAt ? `hạn khiếu nại ${formatDateTime(pr.appealDeadline)} · ${pr.openAppeals} khiếu nại mở` : pr?.settledAt ? `chốt ${formatDateTime(pr.settledAt)}` : undefined}
             />
           </div>
-          {pr && <Progress value={done} />}
+          {pr && (
+            <div className="space-y-1">
+              <Progress value={done} />
+              <p className="text-xs text-muted-foreground">{pr.phase === "open" ? `${done}% thời gian thu bài đã trôi qua` : "Đã đóng thu bài"}</p>
+            </div>
+          )}
           {pr?.frozenAt && <p className="text-xs text-muted-foreground">Số liệu chốt ngày {formatDateTime(pr.frozenAt)}.</p>}
           {(dist.data?.imbalanceWarnings ?? []).map((w, i) => (
             <Alert key={i}>

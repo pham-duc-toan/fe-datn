@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Field } from "@/components/common/misc";
+import { TagPicker } from "@/components/common/tag-picker";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
-import type { Role } from "@/lib/types";
+import { MODALITY_LABEL } from "@/lib/labels";
+import type { Modality, Role } from "@/lib/types";
 import { suggestUsername, usernameError } from "@/lib/tool-names";
 
 const ROLE_OPTIONS: { value: Role; label: string; hint: string }[] = [
@@ -37,6 +39,11 @@ export default function RegisterPage() {
   const shownUsername = usernameTouched ? username : suggestUsername(email);
   const usernameErr = shownUsername ? usernameError(shownUsername) : null;
   const [roles, setRoles] = useState<Role[]>(["labeler"]);
+  // Sở thích chỉ chọn MỘT LẦN ở đây (kiến trúc 3.38): sau đó không xem / sửa lại — gợi ý dự án tự học từ việc bạn làm.
+  const [domains, setDomains] = useState<string[]>([]);
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [mods, setMods] = useState<Modality[]>([]);
+  const laLabeler = roles.includes("labeler");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
@@ -52,7 +59,12 @@ export default function RegisterPage() {
     setError(null);
     setFieldErrors({});
     try {
-      await api("/auth/register", { method: "POST", auth: false, body: { email: email.trim(), username: shownUsername.trim().replace(/^@/, ""), password, displayName: name.trim(), roles } });
+      const skills = laLabeler ? { domains, languages, modalities: mods } : undefined;
+      await api("/auth/register", {
+        method: "POST",
+        auth: false,
+        body: { email: email.trim(), username: shownUsername.trim().replace(/^@/, ""), password, displayName: name.trim(), roles, skills },
+      });
       // Đăng nhập luôn để nhập mã giới thiệu; lời mời dự án tự gắn khi xác thực email (mục 17.5).
       const ch = await login(email.trim(), password);
       if (!ch) {
@@ -149,6 +161,33 @@ export default function RegisterPage() {
               </label>
             ))}
           </div>
+          {laLabeler && (
+            <div className="space-y-3 rounded-md border p-3">
+              <div>
+                <span className="text-sm font-medium">Bạn muốn làm loại việc nào? (tuỳ chọn)</span>
+                <p className="text-xs text-muted-foreground">
+                  Chọn một lần lúc đăng ký để chợ dự án gợi ý đúng hơn ngay từ đầu. Sau đó hệ thống tự học từ những bài bạn làm, bạn không cần cập nhật.
+                </p>
+              </div>
+              <Field label="Lĩnh vực am hiểu" hint={fieldErrors["skills.domains"]?.join(" ") || "Tối đa 5"}>
+                <TagPicker kind="domain" value={domains} onChange={setDomains} max={5} />
+              </Field>
+              <Field label="Ngôn ngữ thành thạo" hint={fieldErrors["skills.languages"]?.join(" ") || "Tối đa 3"}>
+                <TagPicker kind="language" value={languages} onChange={setLanguages} max={3} />
+              </Field>
+              <div className="space-y-2">
+                <span className="text-sm font-medium">Loại dữ liệu muốn làm</span>
+                <div className="flex flex-wrap gap-3">
+                  {(Object.keys(MODALITY_LABEL) as Modality[]).map((m) => (
+                    <label key={m} className="flex items-center gap-1.5 text-sm">
+                      <Checkbox checked={mods.includes(m)} onCheckedChange={(c) => setMods((cur) => (c === true ? cur.concat([m]) : cur.filter((x) => x !== m)))} />
+                      {MODALITY_LABEL[m]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {ref && <p className="text-xs text-muted-foreground">Mã giới thiệu: <b>{ref}</b> — sẽ được áp dụng sau khi đăng ký.</p>}
           <Button type="submit" className="w-full" disabled={busy || roles.length === 0 || Boolean(usernameErr) || !shownUsername}>
             {busy && <Loader2 className="animate-spin" />} Đăng ký

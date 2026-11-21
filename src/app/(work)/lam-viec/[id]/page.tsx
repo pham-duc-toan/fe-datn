@@ -65,7 +65,7 @@ const TOUR: TourStep[] = [
   { target: "danh-dau", title: "Đánh dấu xem lại", body: "Chưa chắc câu nào thì đánh dấu để quay lại sau." },
   { target: "bao-loi", title: "Báo lỗi câu", body: "Mẫu hỏng (không xem được, sai nội dung…) thì báo lỗi. Không bị trừ uy tín; câu bị báo sai nhiều sẽ được loại khỏi chấm." },
   { target: "luu-nhap", title: "Nháp lưu trên máy", body: "Mọi câu trả lời tự lưu nháp ngay trên trình duyệt này. Đổi máy hoặc xoá dữ liệu trình duyệt thì mất nháp." },
-  { target: "dong-ho", title: "Thời gian còn lại", body: "Hết giờ mà chưa nộp thì bài bị huỷ và suất trả cho người khác." },
+  { target: "dong-ho", title: "Thời gian còn lại", body: "Hết giờ mà chưa nộp thì bài bị huỷ. Dự án còn nhận bài thì bạn bắt đầu lại được." },
   { target: "nop-bai", title: "Nộp cả bài", body: "Làm xong thì nộp CẢ BÀI một lần — sau khi nộp không sửa được. Câu bỏ trống bị tính là không giống đa số." },
 ];
 
@@ -429,7 +429,7 @@ export default function ExamPage() {
               <ActionDialog
                 trigger={<Button variant="ghost"><LogOut /> Bỏ bài</Button>}
                 title="Bỏ bài làm?"
-                description="Bài và mọi câu trả lời bị huỷ, suất trả lại cho người khác. Bạn có thể bắt đầu bài mới nếu dự án còn suất."
+                description="Bài và mọi câu trả lời bị huỷ. Bạn có thể bắt đầu bài mới nếu dự án còn nhận bài."
                 confirmLabel="Bỏ bài"
                 destructive
                 onConfirm={async () => {

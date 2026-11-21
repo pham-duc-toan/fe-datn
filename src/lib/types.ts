@@ -16,7 +16,6 @@ export type Profile = {
   bio: string | null;
   avatarUrl: string | null;
   roles: Role[];
-  skills: { domains: string[] | null; languages: string[] | null; modalities: string[] | null };
   createdAt: string;
 };
 
@@ -145,6 +144,10 @@ export type Project = {
   ndaVersion: number;
   requireVerifiedIdentity: boolean;
   consentRequired: boolean;
+  /** Doanh nghiệp bật mẫu xem trước trên thẻ chợ (mặc định bật; hệ thống tự lấy 1 mẫu thật). */
+  previewEnabled: boolean;
+  /** Mã lý do không được hiện mẫu (NDA / nhạy cảm / riêng tư); null = được. */
+  previewBlockedReason: string | null;
   domains: string[];
   languages: string[];
   deleteFilesAfterClose: boolean;
@@ -186,8 +189,8 @@ export type ProjectLimits = {
   passThresholdMax: number;
   minSlots: number;
   maxSlots: number;
-  /** Trần người làm bài = số suất × hệ số này (setting admin). */
-  participantMultiplier: number;
+  /** Hạn chót xa nhất tính từ hôm nay (ngày, setting project.max_duration_days); 0 = không giới hạn. */
+  maxDurationDays: number;
   maxQuestions: number;
   minRewardVnd: number;
   /** Ngưỡng khớp mặc định theo loại công cụ (setting labeling.threshold.*). */
@@ -384,7 +387,7 @@ export type AttemptSummary = {
   goldCorrect: number | null;
   passed: boolean | null;
   finalPassed: boolean | null;
-  /** Được trả thưởng (trong n suất — n bài đạt nộp sớm nhất). Đạt mà false = hết suất thưởng. */
+  /** Được trả thưởng (trong n suất — n bài đạt giống đa số nhất). Đạt mà false = không lọt suất thưởng. */
   rewarded?: boolean | null;
   gradedAt: string | null;
   appealState: AppealState;
@@ -401,13 +404,8 @@ export type ProjectPhase = "open" | "finished" | "graded" | "settled";
 
 export type Slots = {
   projectId: string;
-  /** Số suất THƯỞNG: n bài đạt nộp sớm nhất được thưởng. */
+  /** Số suất THƯỞNG: n bài đạt giống đa số nhất được thưởng. Không có số người làm (kiến trúc 3.38). */
   slots: number;
-  /** Trần người làm bài — available = maxParticipants − đang làm − đã nộp. */
-  maxParticipants: number;
-  inProgress: number;
-  submitted: number;
-  available: number;
   questionCount: number;
   rewardVnd: number;
   passThresholdPercent: number;
@@ -446,15 +444,13 @@ export type Annotation = {
 export type Progress = {
   projectId: string;
   slots: number;
-  /** Trần người làm bài (0 ở bản chụp cũ → dùng slots). */
-  maxParticipants?: number;
   questionCount: number;
   inProgress: number;
   submitted: number;
   expired: number;
   cancelled: number;
   phase: ProjectPhase;
-  finishReason: "du_suat" | "het_han" | "ket_thuc_som" | null;
+  finishReason: "het_han" | "ket_thuc_som" | null;
   deadline: string | null;
   collectionFinishedAt: string | null;
   gradedAt: string | null;
@@ -592,3 +588,93 @@ export interface Tag {
   mergedInto: string | null;
   updatedAt: string;
 }
+
+/* ---------- Gợi ý dự án — feed của reco-svc (kiến trúc 3.39) ---------- */
+
+/** Một mẫu xem trước trên thẻ (doanh nghiệp chọn 1–3 mẫu thật). File qua media-svc có watermark mang mã người xem. */
+export type FeedPreview = {
+  sampleId: string;
+  modality: Modality;
+  fileUrl: string | null;
+  watermarkText: string | null;
+  content: SampleContent | null;
+  snippet: string | null;
+  question: string | null;
+  metadata: SampleMeta;
+};
+
+/** Lý do gợi ý (frontend đổi ra chữ). */
+export type FeedReason = "kiem_tot" | "hop_so_thich" | "hay_dat" | "lam_nhanh" | "moi" | "kham_pha";
+
+/** Một công cụ + câu hỏi của tập nhãn trên thẻ feed. */
+export type FeedTool = { name: string; kind: ToolKind; question: string | null; classes: string[] };
+
+/** Một thẻ feed. KHÔNG có số người đang làm / đã nộp — chỉ số suất, thưởng, hạn chót, thời gian ước tính. */
+export type FeedCard = {
+  id: string;
+  name: string;
+  description: string;
+  modality: Modality;
+  rewardVnd: number;
+  slots: number;
+  questionCount: number;
+  estimatedMinutes: number;
+  deadline: string | null;
+  toolKinds: ToolKind[];
+  domains: string[];
+  languages: string[];
+  requireEntranceTest: boolean;
+  sensitiveContent: boolean;
+  consentRequired: boolean;
+  requireVerifiedIdentity: boolean;
+  isPrivate: boolean;
+  isNew: boolean;
+  /** Thẻ khám phá (1 / 10 thẻ): dự án mới hoặc loại việc bạn chưa từng làm. */
+  explore: boolean;
+  /** Vị trí thẻ trong lượt lướt (gửi lại kèm lượt hiện / mở). */
+  position: number;
+  reasons: FeedReason[];
+  /** Toàn bộ công cụ + câu hỏi (luôn có). */
+  tools: FeedTool[];
+  /** Tối đa 1 mẫu xem trước hệ thống tự lấy (rỗng khi doanh nghiệp tắt / NDA / nhạy cảm / riêng tư). */
+  previews: FeedPreview[];
+};
+
+/** GET /projects/feed?cursor=&pageSize= */
+export type FeedPage = {
+  items: FeedCard[];
+  /** null = đã hết dự án phù hợp. */
+  nextCursor: string | null;
+  requestId: string;
+  sessionId: string;
+};
+
+export type RecoEventKind = "impression" | "open" | "not_interested";
+
+/** PUT /projects/{id}/preview { enabled } — bật / tắt mẫu xem trước trên thẻ chợ. */
+export type PreviewSetting = { enabled: boolean; blockedReason: string | null; showing: boolean };
+
+/** "Xem như labeler" bằng dữ liệu thật (GET /projects/{id}/trial) — không ghi gì. */
+export type TrialAttempt = {
+  projectId: string;
+  labelSchema: LabelSchema;
+  schemaVersion: number;
+  rewardVnd: number;
+  passThresholdPercent: number;
+  sensitiveContent: boolean;
+  realQuestionCount: number;
+  questionCount: number;
+  /** Mẫu hệ thống lấy làm mẫu xem trước trên thẻ chợ (có trong questions). */
+  previewSampleId: string | null;
+  questions: AttemptQuestion[];
+};
+
+/** POST /projects/{id}/trial/check */
+export type TrialCheck = {
+  goldTotal: number;
+  goldCorrect: number;
+  answeredCount: number;
+  invalidAnswers: { index: number; sampleId: string; code: string; message: string }[];
+  gold: { sampleId: string; answered: boolean; correct: boolean; expected: LabelData }[];
+  wouldFailGold: boolean;
+};

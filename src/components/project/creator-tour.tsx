@@ -30,7 +30,7 @@ export const CREATOR_TOUR: TourStep[] = [
   {
     target: "cfg-gia",
     title: "Tiền thưởng, số suất, ngưỡng đạt",
-    body: "Thưởng × số suất (cộng phí nền tảng) được giữ ký quỹ lúc publish. Bài đạt khi giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra; suất trao theo thứ tự nộp sớm.",
+    body: "Thưởng × số suất (cộng phí nền tảng) được giữ ký quỹ lúc publish. Bài đạt khi giống đa số từ ngưỡng t trở lên và không sai câu kiểm tra; suất trao cho các bài đạt giống đa số nhất. Không giới hạn người làm — thu bài tới hạn chót.",
   },
   {
     target: "cfg-kenh",

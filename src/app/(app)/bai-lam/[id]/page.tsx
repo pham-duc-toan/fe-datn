@@ -51,7 +51,7 @@ function ResultCard({ s, freeText }: { s: AttemptSummary; freeText: boolean }) {
             <Clock className="size-5 text-muted-foreground" /> Chờ chấm
           </CardTitle>
           <CardDescription>
-            Bài được chấm một lần khi dự án đóng thu bài (đủ người làm, hết hạn chót hoặc chủ dự án kết thúc sớm). Tiền thưởng trao cho các bài đạt nộp sớm nhất, mỗi suất một bài. Bạn sẽ nhận thông báo kết quả.
+            Bài được chấm một lần khi dự án đóng thu bài (hết hạn chót hoặc chủ dự án kết thúc sớm). Tiền thưởng trao cho các bài đạt giống đa số nhất, mỗi suất một bài. Bạn sẽ nhận thông báo kết quả.
           </CardDescription>
         </CardHeader>
         {freeText && (
@@ -74,7 +74,7 @@ function ResultCard({ s, freeText }: { s: AttemptSummary; freeText: boolean }) {
           {dat ? "Bài đạt" : lapSuat ? "Được thưởng" : "Bài chưa đạt"}
           {lapSuat && <ToneBadge tone="info">lấp suất còn trống</ToneBadge>}
           {s.passed === false && s.finalPassed === true && <ToneBadge tone="success">đạt sau khiếu nại</ToneBadge>}
-          {dat && !thuong && <ToneBadge tone="warning">hết suất thưởng</ToneBadge>}
+          {dat && !thuong && <ToneBadge tone="warning">chưa lọt suất thưởng</ToneBadge>}
         </CardTitle>
         <CardDescription>
           {lapSuat
@@ -82,7 +82,7 @@ function ResultCard({ s, freeText }: { s: AttemptSummary; freeText: boolean }) {
             : thuong
             ? `Đã nhận thưởng ${formatVnd(s.rewardVnd)} vào ví.`
             : dat
-              ? "Bài đạt nhưng các suất thưởng đã được trao cho những bài đạt nộp sớm hơn. Kết quả vẫn được tính vào uy tín của bạn."
+              ? "Bài đạt nhưng các suất thưởng đã được trao cho những bài đạt giống đa số hơn. Kết quả vẫn được tính vào uy tín của bạn."
               : "Không nhận thưởng. Bạn có thể khiếu nại cả bài trong thời hạn."}
         </CardDescription>
       </CardHeader>

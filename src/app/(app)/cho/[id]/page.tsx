@@ -143,11 +143,10 @@ export default function LabelerProjectPage() {
                   [
                     "Suất thưởng",
                     p.fillSlotsMinPercent == null
-                      ? `${p.slots} bài đạt nộp sớm nhất được thưởng`
-                      : `${p.slots} bài đạt nộp sớm nhất được thưởng; còn suất trống thì trao cho bài giống đa số nhất (từ ${p.fillSlotsMinPercent}%, đúng hết câu kiểm tra)`,
+                      ? `${p.slots} bài đạt giống đa số nhất được thưởng`
+                      : `${p.slots} bài đạt giống đa số nhất được thưởng; còn suất trống thì trao cho bài chưa đạt nhưng giống đa số nhất (từ ${p.fillSlotsMinPercent}%, đúng hết câu kiểm tra)`,
                   ],
                   ["Chủ đề", p.domains.map((c) => tagName("domain", c)).concat(p.languages.map((c) => tagName("language", c))).join(" · ") || "—"],
-                  ["Chỗ làm bài", slots.data ? `còn ${slots.data.available} / ${slots.data.maxParticipants || p.slots} (${slots.data.submitted} đã nộp)` : "—"],
                   ["Hạn chót", formatDateTime(p.deadline)],
                   ["Cấp độ tối thiểu", p.minLevel ?? "Không"],
                   ["Uy tín tối thiểu", p.minReputation ?? "Không"],
@@ -202,11 +201,11 @@ export default function LabelerProjectPage() {
                           </Button>
                         </div>
                       );
-                    const open = p.status === "running" && !pastDeadline && (slots.data?.phase ?? "open") === "open" && (slots.data?.available ?? 1) > 0;
+                    const open = p.status === "running" && !pastDeadline && (slots.data?.phase ?? "open") === "open";
                     if (!open)
                       return (
                         <Button className="w-full" disabled>
-                          <PlayCircle /> {pastDeadline ? "Đã quá hạn chót" : slots.data && slots.data.available <= 0 ? "Đã đủ người làm" : "Dự án không nhận bài"}
+                          <PlayCircle /> {pastDeadline ? "Đã quá hạn chót" : "Dự án không nhận bài"}
                         </Button>
                       );
                     return (
