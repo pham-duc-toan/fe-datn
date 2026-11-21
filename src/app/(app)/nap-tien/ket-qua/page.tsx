@@ -31,6 +31,8 @@ export default function DepositResultPage() {
     toGuid(params.get("intent")) ??
     toGuid(params.get("vnp_TxnRef")) ??
     toGuid(params.get("orderId")) ??
+    // ZaloPay: apptransid = "yyMMdd_<32 hex ma lenh>".
+    toGuid(params.get("apptransid")?.split("_").pop() ?? null) ??
     toGuid(typeof window !== "undefined" ? sessionStorage.getItem("crowd.depositIntent") : null);
   const [dep, setDep] = useState<Deposit | null>(null);
   const [error, setError] = useState<string | null>(null);

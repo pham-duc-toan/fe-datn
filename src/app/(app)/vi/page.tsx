@@ -67,7 +67,7 @@ function DepositForm() {
       setIntent(d);
       setKey(newIdempotencyKey());
       if (d.checkoutUrl) {
-        if (chosen === "vnpay" || chosen === "momo") {
+        if (chosen === "vnpay" || chosen === "momo" || chosen === "zalopay") {
           sessionStorage.setItem("crowd.depositIntent", d.intentId);
           window.location.href = d.checkoutUrl;
         } else window.open(d.checkoutUrl, "_blank", "noopener");

@@ -273,6 +273,7 @@ export const PROVIDER_LABEL: Record<string, string> = {
   sandbox: "Cổng thử nghiệm",
   vnpay: "VNPay",
   momo: "MoMo",
+  zalopay: "ZaloPay",
   manual_transfer: "Chuyển khoản ngân hàng",
 };
 
