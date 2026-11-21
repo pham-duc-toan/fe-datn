@@ -1,5 +1,5 @@
 import {
-  BadgeCheck, BarChart3, Bell, Briefcase, Building2, ClipboardCheck, Coins, FileText, Gavel, Home, KeyRound, Landmark,
+  BadgeCheck, BarChart3, Bell, Briefcase, Building2, ClipboardCheck, Coins, FileText, Gavel, Heart, Home, KeyRound, Landmark,
   LayoutTemplate, Link2, ListChecks, Megaphone, PlusCircle, ScrollText, Search, Settings, ShieldAlert, ShieldCheck, Store, Tags, Ticket,
   Trophy, UserCog, Users, Wallet, Fingerprint, Receipt, Share2, type LucideIcon,
 } from "lucide-react";
@@ -20,6 +20,7 @@ export const NAV: Record<Role, NavItem[]> = {
   labeler: [
     { href: "/tong-quan", label: "Tổng quan", icon: Home },
     { href: "/cho", label: "Chợ dự án", icon: Store },
+    { href: "/da-thich", label: "Dự án đã thích", icon: Heart },
     { href: "/viec-cua-toi", label: "Bài làm của tôi", icon: ListChecks },
     { href: "/vi", label: "Ví & thu nhập", icon: Wallet },
     { href: "/cap-do", label: "Cấp độ & xếp hạng", icon: Trophy },

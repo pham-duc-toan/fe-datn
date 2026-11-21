@@ -634,6 +634,8 @@ export type FeedCard = {
   /** Vị trí thẻ trong lượt lướt (gửi lại kèm lượt hiện / mở). */
   position: number;
   reasons: FeedReason[];
+  /** Người xem đã thích (tim) dự án này. */
+  liked: boolean;
   /** Toàn bộ công cụ + câu hỏi (luôn có). */
   tools: FeedTool[];
   /** Tối đa 1 mẫu xem trước hệ thống tự lấy (rỗng khi doanh nghiệp tắt / NDA / nhạy cảm / riêng tư). */

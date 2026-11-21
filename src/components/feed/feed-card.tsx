@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import {
-  AudioLines, CalendarClock, CircleHelp, Clock, Columns2, Compass, EyeOff, FileCheck2, FileText, Image as ImageIcon,
+  AudioLines, CalendarClock, CircleHelp, Clock, Columns2, Compass, EyeOff, FileCheck2, FileText, Heart, Image as ImageIcon,
   ImageOff, Info, ListOrdered, Lock, ScrollText, ShieldAlert, Sparkles, Trophy, UserCheck, Video, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import { ToneBadge } from "@/components/common/status-badge";
 import { useTags } from "@/hooks/use-tags";
 import { formatDate, formatVnd } from "@/lib/format";
@@ -15,7 +18,7 @@ import { FEED_REASON_LABEL, MODALITY_LABEL, TOOL_LABEL, toolKindsText } from "@/
 import { ghiMoThe } from "@/lib/reco-events";
 import type { FeedCard as Card, FeedTool, Modality } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { PreviewMedia } from "./preview-media";
+import { laTheChu, PreviewMedia } from "./preview-media";
 
 type Props = {
   p: Card;
@@ -24,6 +27,8 @@ type Props = {
   /** Thẻ đang ở giữa màn (video tự phát, ra khỏi màn thì dừng). */
   active?: boolean;
   onNotInterested?: () => void;
+  /** Đã thích / bỏ thích xong (trang "Dự án đã thích" bỏ thẻ khỏi danh sách). */
+  onLikedChange?: (liked: boolean) => void;
   /** Bản xem trước cho doanh nghiệp — không ghi lượt mở, nút không bấm được. */
   preview?: boolean;
 };
@@ -43,9 +48,29 @@ const MODALITY_ICON: Record<Modality, LucideIcon> = {
  * "Chi tiết" mở bảng đầy đủ; rộng → khung xem trước bên trái, toàn bộ thông tin bên phải. KHÔNG có số người đang làm.
  * Lượt hiện do trang feed ghi (thẻ ra giữa màn).
  */
-export function FeedCard({ p, requestId, sessionId, active = true, onNotInterested, preview }: Props) {
+export function FeedCard({ p, requestId, sessionId, active = true, onNotInterested, onLikedChange, preview }: Props) {
   const [chiTiet, setChiTiet] = useState(false);
+  const [thich, setThich] = useState(p.liked);
+  const [dangThich, setDangThich] = useState(false);
   const moDuAn = () => ghiMoThe(p.id, p.position, requestId, sessionId);
+
+  // Thích để làm sau (3.40): đổi ngay trên giao diện, lỗi thì trả lại.
+  const doiThich = async () => {
+    if (preview || dangThich) return;
+    const moi = !thich;
+    setThich(moi);
+    setDangThich(true);
+    try {
+      await api(`/reco/likes/${p.id}`, { method: moi ? "PUT" : "DELETE", query: { sessionId: sessionId ?? undefined } });
+      if (moi) toast.success("Đã thích — xem lại ở mục Dự án đã thích.");
+      onLikedChange?.(moi);
+    } catch (e) {
+      setThich(!moi);
+      toast.error(errorMessage(e));
+    } finally {
+      setDangThich(false);
+    }
+  };
 
   return (
     <article className="@container h-full">
@@ -53,6 +78,7 @@ export function FeedCard({ p, requestId, sessionId, active = true, onNotInterest
         <KhungXemTruoc p={p} active={active}>
           {/* Hàng nút dọc kiểu TikTok — chỉ khung hẹp; khung rộng có nút ở cột thông tin. */}
           <div className="absolute right-2 bottom-2 z-10 flex flex-col items-center gap-2.5 @3xl:hidden">
+            <NutTron icon={Heart} label={thich ? "Đã thích" : "Thích"} onClick={() => void doiThich()} disabled={preview} dang={thich} />
             {onNotInterested && <NutTron icon={EyeOff} label="Bỏ qua" onClick={onNotInterested} disabled={preview} />}
             <NutTron icon={Info} label="Chi tiết" onClick={() => setChiTiet(true)} />
           </div>
@@ -77,9 +103,19 @@ export function FeedCard({ p, requestId, sessionId, active = true, onNotInterest
           <ThongTinDayDu p={p} />
           <div className="mt-auto flex gap-2 pt-2">
             <NutXem p={p} preview={preview} onOpen={moDuAn} className="flex-1" />
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => void doiThich()}
+              disabled={preview || dangThich}
+              aria-pressed={thich}
+              title={thich ? "Bỏ thích" : "Thích — lưu lại để làm sau"}
+            >
+              <Heart className={cn(thich && "fill-rose-500 text-rose-500")} /> {thich ? "Đã thích" : "Thích"}
+            </Button>
             {onNotInterested && (
-              <Button variant="outline" size="lg" onClick={onNotInterested} disabled={preview} title="Không quan tâm — ẩn dự án này, gợi ý sau ít loại này hơn">
-                <EyeOff /> Không quan tâm
+              <Button variant="outline" size="icon-lg" onClick={onNotInterested} disabled={preview} title="Không quan tâm — ẩn dự án này, gợi ý sau ít loại này hơn" aria-label="Không quan tâm">
+                <EyeOff />
               </Button>
             )}
           </div>
@@ -123,7 +159,8 @@ function KhungXemTruoc({ p, active, children }: { p: Card; active: boolean; chil
       </div>
 
       <div className="relative mx-3 mt-2 flex min-h-[7rem] flex-1 flex-col overflow-hidden rounded-xl bg-muted/40">
-        <div className="flex min-h-0 flex-1 items-center justify-center p-2">
+        {/* relative: thẻ chữ phủ kín (absolute inset-0) khung này. */}
+        <div className={cn("relative flex min-h-0 flex-1 items-center justify-center", !(mau && laTheChu(mau)) && "p-2")}>
           {mau ? (
             <PreviewMedia p={mau} active={active} />
           ) : (
@@ -175,7 +212,7 @@ function CauHoiTrongBai({ tools, gon }: { tools: FeedTool[]; gon?: boolean }) {
   );
 }
 
-function NutTron({ icon: Icon, label, onClick, disabled }: { icon: LucideIcon; label: string; onClick: () => void; disabled?: boolean }) {
+function NutTron({ icon: Icon, label, onClick, disabled, dang }: { icon: LucideIcon; label: string; onClick: () => void; disabled?: boolean; dang?: boolean }) {
   return (
     <button
       type="button"
@@ -185,7 +222,7 @@ function NutTron({ icon: Icon, label, onClick, disabled }: { icon: LucideIcon; l
       className="flex flex-col items-center gap-0.5 text-[11px] font-medium text-foreground disabled:opacity-50"
     >
       <span className="flex size-10 items-center justify-center rounded-full border bg-background/95 shadow-sm transition-colors hover:bg-muted">
-        <Icon className="size-[18px]" />
+        <Icon className={cn("size-[18px]", dang && "fill-rose-500 text-rose-500")} />
       </span>
       <span className="rounded bg-background/80 px-1">{label}</span>
     </button>

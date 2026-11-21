@@ -36,6 +36,8 @@ export type ApiOptions = {
   /** Header Idempotency-Key cho API tiền (mục 4.1, 5.7). */
   idempotencyKey?: string;
   signal?: AbortSignal;
+  /** Gửi được cả khi trang đang đóng (fetch keepalive, body ≤ 64 KB) — hàng đợi hành vi lúc rời trang. */
+  keepalive?: boolean;
 };
 
 type SessionEndedListener = (reason: string) => void;
@@ -132,6 +134,7 @@ async function send(path: string, opts: ApiOptions, token: string | null): Promi
     headers,
     body,
     signal: opts.signal,
+    keepalive: opts.keepalive,
   });
 }
 

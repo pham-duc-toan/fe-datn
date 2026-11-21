@@ -83,7 +83,8 @@ function NoiDung({ p, d }: { p: Project; d: PreviewDraft }) {
         sampleId: q.sampleId,
         modality: q.modality,
         fileUrl: q.fileUrl,
-        watermarkText: q.watermarkText ?? null,
+        // Thẻ chợ thật không vẽ chữ người xem (bản xem trước dùng chung đã in chữ doanh nghiệp + domain).
+        watermarkText: null,
         content: q.content,
         snippet: q.content?.text ?? null,
         question: q.question,
@@ -114,6 +115,7 @@ function NoiDung({ p, d }: { p: Project; d: PreviewDraft }) {
     explore: false,
     position: 0,
     reasons: ["moi"],
+    liked: false,
     tools: d.schema.tools.map((t) => ({ name: t.name, kind: t.kind, question: t.question?.trim() || null, classes: t.classes ?? [] })),
     previews,
   };
