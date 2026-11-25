@@ -165,7 +165,7 @@ export function RankingPanel({ items, value, onChange, readOnly, seedOrder }: { 
     <div className="space-y-2">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onEnd}>
         <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={readOnly}>
-          <ol className="space-y-1.5">
+          <ol className="space-y-1.5" data-tour="xep-hang">
             {order.map((idx, rank) => (
               <SortableItem key={idx} id={String(idx)}>
                 <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{rank + 1}</span>
@@ -288,11 +288,11 @@ export function ObjectListPanel({
     <div className="space-y-2">
       {!readOnly && (
         <div className="space-y-2">
-          <Button type="button" size="sm" variant={active ? "default" : "outline"} onClick={onActivate} className="w-full">
+          <Button type="button" size="sm" variant={active ? "default" : "outline"} onClick={onActivate} className="w-full" data-tour="dung-cong-cu">
             <MousePointer2 /> {active ? "Đang dùng công cụ này" : "Dùng công cụ này để vẽ / đánh dấu"}
           </Button>
           {active && (
-            <div>
+            <div data-tour="chon-lop">
               <p className="mb-1 text-xs text-muted-foreground">Lớp cho đối tượng mới:</p>
               <ClassChips tool={tool} value={[activeClass]} onPick={onClass} />
             </div>
@@ -302,7 +302,7 @@ export function ObjectListPanel({
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">Chưa có đối tượng nào.</p>
       ) : (
-        <ul className="max-h-64 space-y-1 overflow-y-auto">
+        <ul className="max-h-64 space-y-1 overflow-y-auto" data-tour="ds-doi-tuong">
           {list.map((o, i) => (
             <li
               key={i}
@@ -411,7 +411,7 @@ export function RelationPanel({ tool, spans, text, list, onChange, readOnly }: {
   return (
     <div className="space-y-2">
       {!readOnly && (
-        <div className="space-y-2 rounded-md border p-2">
+        <div className="space-y-2 rounded-md border p-2" data-tour="them-quan-he">
           {opts.length < 2 ? (
             <p className="text-xs text-muted-foreground">Cần đánh dấu ít nhất hai đoạn bằng công cụ “{tool.spanTool}” trước.</p>
           ) : (

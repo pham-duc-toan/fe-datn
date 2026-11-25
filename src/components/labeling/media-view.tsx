@@ -84,7 +84,11 @@ export default function MediaView(p: Props) {
     el.addEventListener("seeked", onTime);
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
+    // File nhỏ / đã có trong cache: metadata có thể tải xong TRƯỚC khi gắn listener → không bao giờ nhận
+    // "loadedmetadata", trình phát kẹt ở "Đang chuẩn bị". Đã có metadata thì xử lý ngay.
+    const r0 = el.readyState >= HTMLMediaElement.HAVE_METADATA ? requestAnimationFrame(onMeta) : 0;
     return () => {
+      cancelAnimationFrame(r0);
       el.removeEventListener("loadedmetadata", onMeta);
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("seeked", onTime);
@@ -185,7 +189,7 @@ export default function MediaView(p: Props) {
   return (
     <div className="space-y-3">
       {kind === "video" ? (
-        <div ref={boxRef} className="relative w-full overflow-hidden rounded-md bg-black" style={{ aspectRatio: `${W} / ${H}` }}>
+        <div ref={boxRef} data-tour="khung-video" className="relative w-full overflow-hidden rounded-md bg-black" style={{ aspectRatio: `${W} / ${H}` }}>
           <video ref={mediaRef} src={isHls ? undefined : src} className="absolute inset-0 h-full w-full" preload="auto" onError={onError} playsInline />
           {trackTools.length > 0 && (
             <div className="absolute inset-0">
@@ -296,7 +300,7 @@ export default function MediaView(p: Props) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" data-tour="dieu-khien-phat">
         <Button type="button" size="icon-sm" variant="outline" onClick={() => seek(t - (kind === "video" ? 0.1 : 1))} aria-label="Lùi">
           <StepBack />
         </Button>
@@ -315,7 +319,7 @@ export default function MediaView(p: Props) {
           </span>
         )}
         {activeSeg && !readOnly && (
-          <div className="ml-auto flex gap-1.5">
+          <div className="ml-auto flex gap-1.5" data-tour="nut-doan">
             {pendingStart === null ? (
               <Button type="button" size="sm" variant="outline" onClick={() => setPendingStart(round2(t))}>
                 <Flag /> Bắt đầu tại {formatSeconds(t)}
@@ -343,6 +347,7 @@ export default function MediaView(p: Props) {
 
       <div
         ref={timelineRef}
+        data-tour="dong-thoi-gian"
         className="relative h-14 cursor-pointer select-none rounded-md border bg-muted/50"
         onMouseDown={(e) => {
           const tt = timeFromX(e.clientX);

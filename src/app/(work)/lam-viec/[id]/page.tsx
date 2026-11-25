@@ -15,6 +15,7 @@ import { ErrorState, Loading } from "@/components/common/states";
 import { Workspace } from "@/components/labeling/workspace";
 import { SpotlightTour, type TourStep } from "@/components/tutorial/spotlight-tour";
 import { markTourDone, readTutorial } from "@/components/tutorial/tutorial-store";
+import { ToolGuideButton } from "@/components/tutorial/tool-practice";
 import { buildPayload, initialData, isBlank, validateLabel } from "@/components/labeling/schema";
 import { useProject } from "@/components/project/use-project";
 import { hasFreeText, schemaToolKinds } from "@/components/project/free-text-notice";
@@ -62,6 +63,7 @@ const TOUR: TourStep[] = [
   { target: "danh-sach-cau", title: "Danh sách câu hỏi", body: "Bấm số để nhảy tới câu bất kỳ, làm theo thứ tự tuỳ ý. Ô xanh là câu đã trả lời, chấm vàng là câu bạn đánh dấu xem lại, viền đỏ là câu chưa hợp lệ." },
   { target: "cau-hoi", title: "Câu hỏi của công cụ", body: "Mỗi công cụ có câu hỏi riêng, hiện nổi bật trên ô công cụ: đọc trước khi gán để biết dùng công cụ đó trả lời gì. Câu nào có dải “Về mẫu này” ở đầu thì đó là ngữ cảnh riêng của mẫu." },
   { target: "khu-gan-nhan", title: "Khu gán nhãn", body: "Mẫu ở bên trái, các công cụ ở bên phải. Chọn lớp trên ô công cụ rồi gán lên mẫu; công cụ vẽ (khung, đa giác, điểm…) thì kéo / bấm trực tiếp trên mẫu." },
+  { target: "tap-cong-cu", title: "Tập dùng công cụ", body: "Chưa quen công cụ nào thì bấm đây để tập với dữ liệu mẫu: hướng dẫn từng bước, tự làm thử rồi chấm ngay — không ảnh hưởng bài làm. Nút báo “mới” khi dự án có công cụ bạn chưa tập." },
   { target: "danh-dau", title: "Đánh dấu xem lại", body: "Chưa chắc câu nào thì đánh dấu để quay lại sau." },
   { target: "bao-loi", title: "Báo lỗi câu", body: "Mẫu hỏng (không xem được, sai nội dung…) thì báo lỗi. Không bị trừ uy tín; câu bị báo sai nhiều sẽ được loại khỏi chấm." },
   { target: "luu-nhap", title: "Nháp lưu trên máy", body: "Mọi câu trả lời tự lưu nháp ngay trên trình duyệt này. Đổi máy hoặc xoá dữ liệu trình duyệt thì mất nháp." },
@@ -276,6 +278,7 @@ export default function ExamPage() {
         actions={
           <>
             <Countdown to={attempt.expiresAt} />
+            <ToolGuideButton schema={attempt.labelSchema} />
             <Button variant="ghost" size="sm" onClick={() => setTourOpen(true)} title="Xem lại tour hướng dẫn trang làm bài">
               <GraduationCap /> Xem lại hướng dẫn
             </Button>

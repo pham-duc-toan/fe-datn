@@ -341,7 +341,7 @@ export default function ImageCanvas(props: Props) {
         </Button>
         <span className="text-xs text-muted-foreground">{Math.round(view.zoom * 100)}% · {W}×{H}px</span>
         {active?.kind === "mask" && !readOnly && (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2" data-tour="co-tay">
             <Button type="button" size="sm" variant={erase ? "outline" : "default"} onClick={() => setErase(false)}>
               <Brush /> Cọ
             </Button>
@@ -353,7 +353,7 @@ export default function ImageCanvas(props: Props) {
           </div>
         )}
       </div>
-      <div ref={wrapRef} className="no-drag relative overflow-hidden rounded-md border bg-[repeating-conic-gradient(#f4f4f5_0_25%,#fff_0_50%)] bg-[length:16px_16px]" style={{ cursor: hand || space ? "grab" : active && !readOnly ? "crosshair" : "default" }}>
+      <div ref={wrapRef} data-tour="vung-ve" className="no-drag relative overflow-hidden rounded-md border bg-[repeating-conic-gradient(#f4f4f5_0_25%,#fff_0_50%)] bg-[length:16px_16px]" style={{ cursor: hand || space ? "grab" : active && !readOnly ? "crosshair" : "default" }}>
         <Stage
           ref={stageRef}
           width={cw}

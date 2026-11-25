@@ -263,7 +263,7 @@ export function Workspace({ schema, modality, fileUrl, watermarkText, content, m
     return (
       <div className="space-y-4">
         {ask}
-        {sample}
+        <div data-tour="mau">{sample}</div>
         <div className="space-y-3">{panels}</div>
       </div>
     );
@@ -272,7 +272,7 @@ export function Workspace({ schema, modality, fileUrl, watermarkText, content, m
     <div className="space-y-4">
       {ask}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0">{sample}</div>
+        <div className="min-w-0" data-tour="mau">{sample}</div>
         <div className="space-y-3 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto lg:pr-1">{panels}</div>
       </div>
     </div>

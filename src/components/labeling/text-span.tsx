@@ -78,6 +78,7 @@ export function TextSpanView({ text, spanTools, spans, activeTool, activeClass, 
   return (
     <div
       ref={ref}
+      data-tour="van-ban"
       onMouseUp={onMouseUp}
       className="min-h-32 rounded-md border bg-card p-4 text-[15px] leading-8 whitespace-pre-wrap break-words select-text"
     >

@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/page-header";
 import { Workspace } from "@/components/labeling/workspace";
+import { ToolGuideButton } from "@/components/tutorial/tool-practice";
 import { buildPayload, validateLabel } from "@/components/labeling/schema";
 import { api, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
@@ -84,7 +85,7 @@ export default function EntranceTestPage() {
 
   return (
     <>
-      <PageHeader back={{ href: `/cho/${id}`, label: project.data?.name ?? "Dự án" }} title="Bài test đầu vào" description="Chấm tự động theo đáp án có sẵn; đáp án không được hiện. Mỗi lần làm 30 phút, tối đa 3 lần." />
+      <PageHeader back={{ href: `/cho/${id}`, label: project.data?.name ?? "Dự án" }} title="Bài test đầu vào" description="Chấm tự động theo đáp án có sẵn; đáp án không được hiện. Mỗi lần làm 30 phút, tối đa 3 lần." actions={attempt ? <ToolGuideButton schema={attempt.labelSchema} /> : undefined} />
       {result && (
         <Alert className="mb-6" variant={result.passed ? "default" : "destructive"}>
           {result.passed ? <CheckCircle2 /> : <XCircle />}
