@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Briefcase, Link2, ShieldCheck, Tags, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/providers/auth-provider";
+import { trangChu } from "@/lib/nav";
 
 const FEATURES = [
   { icon: Briefcase, title: "Doanh nghiệp", text: "Tạo dự án, đặt tập nhãn với 15 loại công cụ, nạp dữ liệu, ký quỹ và nhận kết quả đã gộp đồng thuận." },
@@ -19,7 +20,7 @@ export default function Home() {
   const { status, activeRole } = useAuth();
   const router = useRouter();
   useEffect(() => {
-    if (status === "authed") router.replace(activeRole === "admin" ? "/admin" : "/tong-quan");
+    if (status === "authed") router.replace(trangChu(activeRole));
   }, [status, activeRole, router]);
 
   return (

@@ -7,68 +7,141 @@ import type { Role } from "./types";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
 
-export const NAV: Record<Role, NavItem[]> = {
-  business: [
-    { href: "/tong-quan", label: "Tổng quan", icon: Home },
-    { href: "/du-an", label: "Dự án của tôi", icon: Briefcase, exact: true },
-    { href: "/du-an/moi", label: "Tạo dự án", icon: PlusCircle },
-    { href: "/vi", label: "Ví & nạp tiền", icon: Wallet },
-    { href: "/doanh-nghiep/kyb", label: "Hồ sơ doanh nghiệp", icon: Building2 },
-    { href: "/hoa-don", label: "Hoá đơn VAT", icon: Receipt },
-    { href: "/labeler-cua-toi", label: "Danh sách labeler", icon: Users },
-  ],
-  labeler: [
-    { href: "/tong-quan", label: "Tổng quan", icon: Home },
-    { href: "/cho", label: "Chợ dự án", icon: Store },
-    { href: "/da-thich", label: "Dự án đã thích", icon: Heart },
-    { href: "/viec-cua-toi", label: "Bài làm của tôi", icon: ListChecks },
-    { href: "/vi", label: "Ví & thu nhập", icon: Wallet },
-    { href: "/cap-do", label: "Cấp độ & xếp hạng", icon: Trophy },
-    { href: "/join", label: "Tham gia bằng mã", icon: Ticket },
-  ],
-  // Tài khoản cũ đăng ký với vai trò "sharer" (nay không còn là vai trò): các trang link nằm ở linkNav.
-  sharer: [
-    { href: "/tong-quan", label: "Tổng quan", icon: Home },
-    { href: "/vi", label: "Ví & rút tiền", icon: Wallet },
-  ],
-  admin: [
-    { href: "/admin", label: "Tổng quan", icon: Home, exact: true },
-    { href: "/admin/viec-tay", label: "Việc cần xử lý tay", icon: ClipboardCheck },
-    { href: "/admin/kyb", label: "Hồ sơ KYB", icon: Building2 },
-    { href: "/admin/xac-minh", label: "Xác minh danh tính", icon: Fingerprint },
-    { href: "/admin/du-an", label: "Dự án chờ duyệt", icon: Briefcase },
-    { href: "/admin/khieu-nai", label: "Khiếu nại bài làm", icon: Gavel },
-    { href: "/admin/rut-tien", label: "Duyệt rút tiền", icon: Coins },
-    { href: "/admin/nap-tien", label: "Nạp chuyển khoản", icon: Landmark },
-    { href: "/admin/gian-lan", label: "Nghi gian lận", icon: ShieldAlert },
-    { href: "/admin/nguoi-dung", label: "Người dùng", icon: UserCog },
-    { href: "/admin/link", label: "Kiểm duyệt link", icon: Link2 },
-    { href: "/admin/cai-dat", label: "Cài đặt hệ thống", icon: Settings },
-    { href: "/admin/nhat-ky", label: "Nhật ký hoạt động", icon: ScrollText },
-    { href: "/admin/thong-bao", label: "Thông báo hệ thống", icon: Megaphone },
-    { href: "/admin/mau", label: "Mẫu bài toán", icon: LayoutTemplate },
-    { href: "/admin/the", label: "Thẻ lĩnh vực & ngôn ngữ", icon: Tags },
-    { href: "/admin/watermark", label: "Truy watermark", icon: Search },
-    { href: "/admin/hoa-don", label: "Hoá đơn", icon: FileText },
+/**
+ * Một nhóm menu. title rỗng = không có tiêu đề (mục "Tổng quan" đầu menu). collapsed = nhóm ÍT DÙNG: thu gọn mặc
+ * định, nằm cuối menu, tự mở khi đang ở một trang trong nhóm.
+ */
+export type NavGroup = { title?: string; items: NavItem[]; collapsed?: boolean };
+
+/** Nhóm "Kiếm tiền từ link" — labeler (và tài khoản cũ "sharer"), không phải vai trò riêng. */
+const LINK_GROUP: NavGroup = {
+  title: "Kiếm tiền từ link",
+  items: [
+    { href: "/link", label: "Link của tôi", icon: Link2, exact: true },
+    { href: "/link/thong-ke", label: "Thống kê link", icon: BarChart3 },
+    { href: "/link/api", label: "API rút gọn", icon: KeyRound },
+    { href: "/link/gioi-thieu", label: "Giới thiệu bạn bè", icon: Share2 },
   ],
 };
 
-/** Vai trò có chức năng chia sẻ link kiếm tiền: labeler (và tài khoản cũ "sharer"). Doanh nghiệp / admin không có. */
-export function canShareLinks(role: Role | null): boolean {
-  return role === "labeler" || role === "sharer";
+export const NAV: Record<Role, NavGroup[]> = {
+  business: [
+    {
+      title: "Dự án",
+      items: [
+        { href: "/du-an", label: "Dự án của tôi", icon: Briefcase, exact: true },
+        { href: "/du-an/moi", label: "Tạo dự án", icon: PlusCircle },
+        { href: "/labeler-cua-toi", label: "Danh sách labeler", icon: Users },
+      ],
+    },
+    {
+      title: "Tài chính",
+      items: [
+        { href: "/vi", label: "Ví & nạp tiền", icon: Wallet },
+        { href: "/hoa-don", label: "Hoá đơn VAT", icon: Receipt },
+      ],
+    },
+    {
+      title: "Tài khoản",
+      items: [
+        { href: "/tai-khoan/ho-so", label: "Thông tin cá nhân", icon: BadgeCheck },
+        { href: "/doanh-nghiep/kyb", label: "Hồ sơ doanh nghiệp", icon: Building2 },
+      ],
+    },
+  ],
+  labeler: [
+    {
+      title: "Tìm việc",
+      items: [
+        { href: "/cho", label: "Chợ dự án", icon: Store },
+        { href: "/da-thich", label: "Dự án đã thích", icon: Heart },
+        { href: "/join", label: "Tham gia bằng mã", icon: Ticket },
+      ],
+    },
+    {
+      title: "Công việc & thu nhập",
+      items: [
+        { href: "/viec-cua-toi", label: "Bài làm của tôi", icon: ListChecks },
+        { href: "/vi", label: "Ví & thu nhập", icon: Wallet },
+        { href: "/cap-do", label: "Cấp độ & xếp hạng", icon: Trophy },
+        { href: "/tai-khoan/ho-so", label: "Thông tin cá nhân", icon: BadgeCheck },
+      ],
+    },
+    LINK_GROUP,
+  ],
+  // Tài khoản cũ đăng ký với vai trò "sharer" (nay không còn là vai trò).
+  sharer: [
+    {
+      items: [
+        { href: "/tai-khoan/ho-so", label: "Thông tin cá nhân", icon: BadgeCheck },
+        { href: "/vi", label: "Ví & rút tiền", icon: Wallet },
+      ],
+    },
+    LINK_GROUP,
+  ],
+  admin: [
+    { items: [{ href: "/admin", label: "Tổng quan", icon: Home, exact: true }] },
+    {
+      title: "Duyệt hồ sơ",
+      items: [
+        { href: "/admin/du-an", label: "Dự án chờ duyệt", icon: Briefcase },
+        { href: "/admin/kyb", label: "Hồ sơ KYB", icon: Building2 },
+        { href: "/admin/xac-minh", label: "Xác minh danh tính", icon: Fingerprint },
+        { href: "/admin/khieu-nai", label: "Khiếu nại bài làm", icon: Gavel },
+      ],
+    },
+    {
+      title: "Tiền",
+      items: [
+        { href: "/admin/rut-tien", label: "Duyệt rút tiền", icon: Coins },
+        { href: "/admin/nap-tien", label: "Nạp chuyển khoản", icon: Landmark },
+        { href: "/admin/hoa-don", label: "Hoá đơn", icon: FileText },
+      ],
+    },
+    {
+      title: "Người dùng & an toàn",
+      items: [
+        { href: "/admin/nguoi-dung", label: "Người dùng", icon: UserCog },
+        { href: "/admin/gian-lan", label: "Nghi gian lận", icon: ShieldAlert },
+        { href: "/admin/link", label: "Kiểm duyệt link", icon: Link2 },
+      ],
+    },
+    {
+      title: "Nội dung & cấu hình",
+      items: [
+        { href: "/admin/thong-bao", label: "Thông báo hệ thống", icon: Megaphone },
+        { href: "/admin/mau", label: "Mẫu bài toán", icon: LayoutTemplate },
+        { href: "/admin/the", label: "Thẻ lĩnh vực & ngôn ngữ", icon: Tags },
+        { href: "/admin/cai-dat", label: "Cài đặt hệ thống", icon: Settings },
+      ],
+    },
+    {
+      title: "Ít dùng",
+      collapsed: true,
+      items: [
+        { href: "/admin/nhat-ky", label: "Nhật ký hoạt động", icon: ScrollText },
+        { href: "/admin/watermark", label: "Truy watermark", icon: Search },
+        { href: "/admin/viec-tay", label: "Việc cần xử lý tay", icon: ClipboardCheck },
+      ],
+    },
+  ],
+};
+
+/**
+ * Trang chính sau khi đăng nhập / bấm logo / đổi vai trò. Không còn trang "Tổng quan" riêng: labeler lướt feed
+ * (Chợ dự án), doanh nghiệp vào Dự án của tôi; số liệu tổng quan nằm ở đầu trang Thông tin cá nhân.
+ */
+export function trangChu(role: Role | null): string {
+  if (role === "admin") return "/admin";
+  if (role === "business") return "/du-an";
+  if (role === "sharer") return "/link";
+  return "/cho";
 }
 
-/** Nhóm "Kiếm tiền từ link" — hiện dưới menu labeler, không phải vai trò riêng. */
-export const LINK_NAV: NavItem[] = [
-  { href: "/link", label: "Link của tôi", icon: Link2, exact: true },
-  { href: "/link/thong-ke", label: "Thống kê link", icon: BarChart3 },
-  { href: "/link/api", label: "API rút gọn", icon: KeyRound },
-  { href: "/link/gioi-thieu", label: "Giới thiệu bạn bè", icon: Share2 },
-];
-
+/** Tài khoản: nằm trong menu ảnh đại diện (góc trên phải), chuông thông báo cũng ở đó — không lặp lại ở thanh bên. */
 export const ACCOUNT_NAV: NavItem[] = [
   { href: "/thong-bao", label: "Thông báo", icon: Bell },
-  { href: "/tai-khoan/ho-so", label: "Hồ sơ cá nhân", icon: BadgeCheck },
+  { href: "/tai-khoan/ho-so", label: "Thông tin cá nhân", icon: BadgeCheck },
   { href: "/tai-khoan/bao-mat", label: "Bảo mật & 2FA", icon: ShieldCheck },
   { href: "/tai-khoan/xac-minh", label: "Xác minh danh tính", icon: Fingerprint },
   { href: "/tai-khoan/thong-bao", label: "Cài đặt thông báo", icon: Settings },

@@ -77,7 +77,6 @@ const DUYET: { href: string; label: string }[] = [
   { href: "/admin/khieu-nai", label: "Khiếu nại bài làm" },
   { href: "/admin/link", label: "Link bị báo cáo" },
   { href: "/admin/link?tab=gioi-thieu", label: "Giới thiệu nghi lạm dụng" },
-  { href: "/admin/viec-tay", label: "Việc cần xử lý tay" },
 ];
 
 export default function AdminHome() {

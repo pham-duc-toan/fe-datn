@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Menu, MailWarning, Tags, ChevronsUpDown } from "lucide-react";
+import { LogOut, Menu, MailWarning, Tags, ChevronsUpDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -16,7 +16,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { FullPageSpinner } from "@/components/common/states";
 import { NotificationBell, useOpenNotification } from "./notification-bell";
 import { useRealtimeNotifications } from "@/hooks/use-realtime";
-import { ACCOUNT_NAV, LINK_NAV, NAV, canShareLinks, type NavItem } from "@/lib/nav";
+import { ACCOUNT_NAV, NAV, trangChu, type NavGroup, type NavItem } from "@/lib/nav";
 import { ROLE_LABEL } from "@/lib/labels";
 import { api, post } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
@@ -24,12 +24,14 @@ import type { Profile, Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/config";
 
+const laTrang = (it: NavItem, pathname: string) => (it.exact ? pathname === it.href : pathname === it.href || pathname.startsWith(it.href + "/"));
+
 function NavLinks({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-0.5">
       {items.map((it) => {
-        const active = it.exact ? pathname === it.href : pathname === it.href || pathname.startsWith(it.href + "/");
+        const active = laTrang(it, pathname);
         const Icon = it.icon;
         return (
           <Link
@@ -68,7 +70,7 @@ function RoleSwitcher() {
             key={r}
             onClick={() => {
               setActiveRole(r);
-              router.push(r === "admin" ? "/admin" : "/tong-quan");
+              router.push(trangChu(r));
             }}
           >
             {ROLE_LABEL[r]}
@@ -82,7 +84,7 @@ function RoleSwitcher() {
 function SidebarBody({ role, onNavigate }: { role: Role | null; onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col gap-4">
-      <Link href={role === "admin" ? "/admin" : "/tong-quan"} className="flex items-center gap-2 px-2.5 pt-1 font-semibold" onClick={onNavigate}>
+      <Link href={trangChu(role)} className="flex items-center gap-2 px-2.5 pt-1 font-semibold" onClick={onNavigate}>
         <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <Tags className="size-4" />
         </span>
@@ -90,17 +92,34 @@ function SidebarBody({ role, onNavigate }: { role: Role | null; onNavigate?: () 
       </Link>
       <RoleSwitcher />
       <div className="flex-1 space-y-4 overflow-y-auto">
-        {role && <NavLinks items={NAV[role]} onNavigate={onNavigate} />}
-        {canShareLinks(role) && (
-          <div className="space-y-1">
-            <div className="px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Kiếm tiền từ link</div>
-            <NavLinks items={LINK_NAV} onNavigate={onNavigate} />
-          </div>
-        )}
+        {role && NAV[role].map((g, i) => <NavSection key={g.title ?? i} group={g} onNavigate={onNavigate} />)}
       </div>
-      <div className="border-t pt-3">
-        <NavLinks items={ACCOUNT_NAV} onNavigate={onNavigate} />
-      </div>
+    </div>
+  );
+}
+
+/** Một nhóm menu có tiêu đề; nhóm ít dùng thu gọn mặc định (tự mở khi đang ở trang trong nhóm). */
+function NavSection({ group, onNavigate }: { group: NavGroup; onNavigate?: () => void }) {
+  const pathname = usePathname();
+  const dangO = group.items.some((it) => laTrang(it, pathname));
+  const [mo, setMo] = useState(false);
+  const hien = !group.collapsed || mo || dangO;
+  return (
+    <div className={cn("space-y-1", group.collapsed && "border-t pt-3")}>
+      {group.title &&
+        (group.collapsed ? (
+          <button
+            type="button"
+            onClick={() => setMo((x) => !x)}
+            className="flex w-full items-center gap-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            aria-expanded={hien}
+          >
+            <ChevronRight className={cn("size-3.5 transition-transform", hien && "rotate-90")} /> {group.title}
+          </button>
+        ) : (
+          <div className="px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.title}</div>
+        ))}
+      {hien && <NavLinks items={group.items} onNavigate={onNavigate} />}
     </div>
   );
 }

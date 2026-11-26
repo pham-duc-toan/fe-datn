@@ -18,6 +18,8 @@ import { ROLE_LABEL } from "@/lib/labels";
 import type { Profile } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { usernameError } from "@/lib/tool-names";
+import { useAuth } from "@/components/providers/auth-provider";
+import { AccountSummary } from "@/components/account/account-summary";
 
 export default function ProfilePage() {
   const q = useQuery({ queryKey: ["profile"], queryFn: () => api<Profile>("/me/profile") });
@@ -27,6 +29,7 @@ export default function ProfilePage() {
 
 function ProfileForm({ p }: { p: Profile }) {
   const qc = useQueryClient();
+  const { activeRole } = useAuth();
   const [name, setName] = useState(p.displayName);
   const [username, setUsername] = useState(p.username ?? "");
   const usernameErr = username !== p.username ? usernameError(username) : null;
@@ -61,7 +64,9 @@ function ProfileForm({ p }: { p: Profile }) {
 
   return (
     <>
-      <PageHeader title="Hồ sơ cá nhân" description="Tên và ảnh hiện với chủ dự án, trên bảng xếp hạng. Email không bao giờ được công khai." />
+      <PageHeader title={`Xin chào, ${p.displayName}`} description="Tổng quan tài khoản và hồ sơ cá nhân. Tên và ảnh hiện với chủ dự án, trên bảng xếp hạng; email không bao giờ được công khai." />
+      <AccountSummary role={activeRole} />
+      <h2 className="mb-3 text-base font-semibold">Hồ sơ cá nhân</h2>
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <Card>
           <CardContent className="flex flex-col items-center gap-3 text-center">
