@@ -2,9 +2,9 @@
 
 import { Fragment, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ChevronDown, ChevronRight, Download, FileText, Loader2, Search } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Download, FileText, Loader2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,11 +18,11 @@ import { ToneBadge } from "@/components/common/status-badge";
 import { Pager } from "@/components/common/pager";
 import { ImageThumb, ImageViewer } from "@/components/common/image-viewer";
 import { useSamples } from "@/hooks/use-samples";
-import { api, downloadFile } from "@/lib/api";
+import { api, downloadFile, post } from "@/lib/api";
 import { describeTool } from "@/lib/describe";
 import { errorMessage } from "@/lib/errors";
-import { shortId } from "@/lib/format";
-import type { LabelData, LabelSchema, Project, Sample, SampleContent, SampleMeta } from "@/lib/types";
+import { formatBytes, formatDateTime, shortId } from "@/lib/format";
+import type { ExportJob, LabelData, LabelSchema, Project, Sample, SampleContent, SampleMeta } from "@/lib/types";
 import { useUrlPage } from "@/lib/use-url-state";
 
 // Workspace dùng konva — chỉ tải khi mở chi tiết một mẫu.
@@ -62,6 +62,105 @@ function exportFormats(p: Project): { f: string; label: string }[] {
   if (p.modality === "text" && kinds.has("span")) out.push({ f: "conll", label: "CoNLL (BIO)" });
   if (p.modality === "video" && kinds.has("track")) out.push({ f: "mot", label: "MOT" });
   return out;
+}
+
+const exportPending = (j: ExportJob) => j.status === "queued" || j.status === "processing";
+
+/**
+ * Tải kết quả: file tạo NỀN (POST .../exports → 202). Mỗi định dạng giữ lần tạo mới nhất; còn lần đang tạo thì tự hỏi
+ * lại 2 giây/lần tới khi xong. Rời trang vẫn tiếp tục — mở lại thấy file đã sẵn sàng.
+ */
+function ExportCard({ p }: { p: Project }) {
+  const qc = useQueryClient();
+  const jobs = useQuery({
+    queryKey: ["exports", p.id],
+    queryFn: () => api<ExportJob[]>(`/annotations/projects/${p.id}/exports`),
+    refetchInterval: (q) => ((q.state.data ?? []).some(exportPending) ? 2000 : false),
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const latest = new Map<string, ExportJob>();
+  for (const j of jobs.data ?? []) if (!latest.has(j.format)) latest.set(j.format, j);
+
+  async function create(format: string) {
+    setBusy(format);
+    try {
+      await post<ExportJob>(`/annotations/projects/${p.id}/exports`, { format });
+      await qc.invalidateQueries({ queryKey: ["exports", p.id] });
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function download(j: ExportJob) {
+    if (!j.downloadPath) return;
+    setBusy(j.id);
+    try {
+      await downloadFile(j.downloadPath, undefined, j.fileName ?? `ket-qua-${p.id}`);
+    } catch (e) {
+      toast.error(errorMessage(e));
+      void qc.invalidateQueries({ queryKey: ["exports", p.id] });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Tải kết quả</CardTitle>
+        <CardDescription>
+          File cho kỹ sư / mô hình học máy: kết quả gộp đa số từ nhãn của các bài đạt. Bấm “Tạo file” — hệ thống tạo ở chế độ nền, xong thì hiện nút tải về
+          (có thể rời trang trong lúc chờ).
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="divide-y rounded-md border">
+          {exportFormats(p).map(({ f, label }) => {
+            const j = latest.get(f);
+            const pending = j !== undefined && exportPending(j);
+            return (
+              <li key={f} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                <span className="w-32 shrink-0 text-sm font-medium">{label}</span>
+                <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+                  {!j && "Chưa tạo file"}
+                  {pending && (
+                    <span className="inline-flex items-center gap-1 text-sky-700">
+                      <Loader2 className="size-3 animate-spin" /> {j!.status === "queued" ? "Đang chờ tạo file…" : "Đang tạo file…"}
+                    </span>
+                  )}
+                  {j?.status === "ready" && (
+                    <>
+                      Đã tạo {j.finishedAt ? formatDateTime(j.finishedAt) : ""} · {j.sampleCount ?? 0} mẫu · {formatBytes(j.sizeBytes)}
+                    </>
+                  )}
+                  {j?.status === "failed" && (
+                    <span className="inline-flex items-start gap-1 text-destructive">
+                      <AlertCircle className="mt-0.5 size-3 shrink-0" /> {j.error ?? "Không tạo được file."}
+                    </span>
+                  )}
+                </span>
+                <span className="flex gap-2">
+                  {j?.status === "ready" && (
+                    <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void download(j)}>
+                      {busy === j.id ? <Loader2 className="animate-spin" /> : <Download />} Tải về
+                    </Button>
+                  )}
+                  {!pending && (
+                    <Button size="sm" variant={j ? "ghost" : "outline"} disabled={busy !== null} onClick={() => void create(f)} title={j ? "Tạo lại theo kết quả mới nhất" : undefined}>
+                      {busy === f ? <Loader2 className="animate-spin" /> : j ? <RefreshCw /> : <FileText />} {j ? "Tạo lại" : "Tạo file"}
+                    </Button>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+    </Card>
+  );
 }
 
 /** Kết quả gộp của một công cụ, bằng chữ. */
@@ -140,7 +239,6 @@ export function ResultsTab({ project: p }: { project: Project }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useUrlPage();
   const [open, setOpen] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
 
   const filtered = useMemo(() => (q.data?.samples ?? []).filter((s) => !onlyDisputed || s.disputed), [q.data, onlyDisputed]);
@@ -155,34 +253,7 @@ export function ResultsTab({ project: p }: { project: Project }) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Tải kết quả</CardTitle>
-          <CardDescription>File cho kỹ sư / mô hình học máy: kết quả gộp đa số từ nhãn của các bài đạt.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {exportFormats(p).map(({ f, label }) => (
-            <Button
-              key={f}
-              variant="outline"
-              size="sm"
-              disabled={busy !== null}
-              onClick={async () => {
-                setBusy(f);
-                try {
-                  await downloadFile(`/annotations/projects/${p.id}/export`, { format: f }, `ket-qua-${p.id}.${f === "csv" ? "csv" : f === "json" || f.startsWith("coco") ? "json" : "zip"}`);
-                } catch (e) {
-                  toast.error(errorMessage(e));
-                } finally {
-                  setBusy(null);
-                }
-              }}
-            >
-              {busy === f ? <Loader2 className="animate-spin" /> : <Download />} {label}
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
+      <ExportCard p={p} />
       <QueryState query={q}>
         {(r) => (
           <>

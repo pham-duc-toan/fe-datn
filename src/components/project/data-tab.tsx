@@ -17,11 +17,11 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { Pager } from "@/components/common/pager";
 import { QueryState } from "@/components/common/states";
 import { ActionDialog } from "@/components/common/action-dialog";
-import { api, del, post, put, uploadForm, uploadToSignedUrl } from "@/lib/api";
+import { api, del, post, put, uploadToSignedUrl } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { ingestState, type Tone } from "@/lib/labels";
-import type { IngestResult, IngestStatus, Paged, Project, Sample } from "@/lib/types";
+import type { IngestResult, IngestStatus, Paged, Project, Sample, ZipImport } from "@/lib/types";
 import { useUrlPage } from "@/lib/use-url-state";
 import { ManualRows } from "./manual-rows";
 
@@ -63,6 +63,8 @@ type Row = {
   note?: string;
   /** Nạp từ nguồn ngoài: chặng "xếp hàng" là chờ tải về chứ không phải chờ sau upload. */
   external?: boolean;
+  /** File ZIP ảnh đã đăng ký: theo dõi phiếu giải nén qua GET samples/status (zipImports). */
+  zipId?: string;
 };
 
 const STAGE_TONE: Record<Stage, Tone> = {
@@ -82,9 +84,9 @@ function stageLabel(r: Row): string {
     case "registering":
       return "Đã upload — đang đăng ký";
     case "queued":
-      return r.external ? "Chờ tải về và xử lý" : "Đã upload — chờ xử lý";
+      return r.zipId ? "Đã upload — chờ giải nén" : r.external ? "Chờ tải về và xử lý" : "Đã upload — chờ xử lý";
     case "processing":
-      return "Đang xử lý file";
+      return r.zipId ? "Đang giải nén" : "Đang xử lý file";
     case "preparing":
       return "Đang chuẩn bị video";
     case "done":
@@ -104,6 +106,16 @@ function stageFromSample(s: Sample): { stage: Stage; note?: string } {
   if (s.mediaState === "preparing") return { stage: "preparing" };
   return { stage: "done" };
 }
+
+/** Phiếu giải nén ZIP (server) → chặng hiển thị. */
+function stageFromZip(z: ZipImport): { stage: Stage; note?: string } {
+  if (z.status === "failed") return { stage: "failed", note: z.error ?? "Không giải nén được file ZIP." };
+  if (z.status === "queued") return { stage: "queued" };
+  if (z.status === "processing") return { stage: "processing", note: z.processed > 0 ? `Đã đọc ${z.processed} file trong ZIP…` : "Đang tải ZIP và kiểm tra từng ảnh…" };
+  return { stage: "done", note: `${z.ready} ảnh hợp lệ${z.skipped > 0 ? `, bỏ qua ${z.skipped} (sai định dạng hoặc trùng nội dung)` : ""}.` };
+}
+
+const zipPending = (z: ZipImport) => z.status === "queued" || z.status === "processing";
 
 function reasonFor(errors: string[], index: number): string {
   return errors.find((e) => e.startsWith(`dòng ${index + 1}:`))?.replace(/^dòng \d+:\s*/, "") ?? "Bị bỏ qua (sai định dạng hoặc đã nạp trước đó).";
@@ -210,11 +222,21 @@ export function DataTab({ project: p }: { project: Project }) {
 
   const status = useQuery({
     queryKey: ["sample-status", p.id],
-    queryFn: () => api<IngestStatus>(`/projects/${p.id}/samples/status`),
+    queryFn: async () => {
+      const prev = qc.getQueryData<IngestStatus>(["sample-status", p.id]);
+      const next = await api<IngestStatus>(`/projects/${p.id}/samples/status`);
+      // Một file ZIP vừa giải nén xong (lần hỏi trước còn chờ): có mẫu mới — làm mới danh sách mẫu + điều kiện publish.
+      const wasPending = new Set((prev?.zipImports ?? []).filter(zipPending).map((z) => z.id));
+      if ((next.zipImports ?? []).some((z) => wasPending.has(z.id) && !zipPending(z))) {
+        void qc.invalidateQueries({ queryKey: ["samples", p.id] });
+        void qc.invalidateQueries({ queryKey: ["readiness", p.id] });
+      }
+      return next;
+    },
     // Còn file đang chờ / đang xử lý (kể cả nhập từ nguồn ngoài, mở lại trang) thì tự cập nhật.
     refetchInterval: (q) => {
       const d = q.state.data;
-      return d && (d.queued + d.processing > 0 || d.preparingVideo > 0) ? 2000 : false;
+      return d && (d.queued + d.processing > 0 || d.preparingVideo > 0 || (d.zipImports ?? []).some(zipPending)) ? 2000 : false;
     },
   });
   const [page, setPage] = useUrlPage();
@@ -336,19 +358,20 @@ export function DataTab({ project: p }: { project: Project }) {
     }
   }
 
+  /**
+   * ZIP ảnh đi đúng đường upload thẳng như file thường: xin link → PUT lên kho (có %) → đăng ký phiếu giải nén (202).
+   * Giải nén, kiểm tra từng ảnh, bỏ ảnh trùng chạy nền — rời trang vẫn tiếp tục, mở lại thấy ở “Tiến trình xử lý”.
+   */
   async function uploadZip(f: File) {
     const uid = crypto.randomUUID();
     setRows((prev) => [{ uid, name: f.name, size: f.size, stage: "uploading", progress: 0 }, ...prev]);
     setBusy(true);
     try {
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await uploadForm<IngestResult>(`/projects/${p.id}/samples/zip`, fd, {
-        onProgress: (fraction) => patch(uid, { progress: fraction }),
-        // Byte cuối đã rời trình duyệt: server đang giải nén, kiểm tra từng ảnh, bỏ ảnh trùng.
-        onUploaded: () => patch(uid, { stage: "processing", progress: 1, note: "Đang giải nén và kiểm tra từng ảnh…" }),
-      });
-      patch(uid, { stage: "done", note: `${res.ready} ảnh hợp lệ${res.skipped > 0 ? `, bỏ qua ${res.skipped} (sai định dạng hoặc trùng nội dung)` : ""}.` });
+      const [slot] = await post<{ name: string; key: string; uploadUrl: string }[]>(`/projects/${p.id}/uploads`, { files: [{ name: f.name, sizeBytes: f.size }] });
+      await uploadToSignedUrl(slot.uploadUrl, f, (fraction) => patch(uid, { progress: fraction }));
+      patch(uid, { stage: "registering", progress: 1 });
+      const z = await post<ZipImport>(`/projects/${p.id}/samples/zip`, { key: slot.key, name: f.name });
+      patch(uid, { zipId: z.id, ...stageFromZip(z) });
     } catch (e) {
       patch(uid, { stage: "failed", note: errorMessage(e) });
     } finally {
@@ -424,9 +447,21 @@ export function DataTab({ project: p }: { project: Project }) {
 
   const isFile = ["image", "audio", "video"].includes(p.modality);
   const st = status.data;
-  const inProgress = st ? st.queued + st.processing : 0;
+  const zipBusy = (st?.zipImports ?? []).filter(zipPending).length;
+  const inProgress = st ? st.queued + st.processing + zipBusy : 0;
   const total = st ? st.queued + st.processing + st.ready + st.failed : 0;
-  const showProgress = rows.length > 0 || total > 0;
+  // Dòng ZIP lấy chặng từ phiếu giải nén trên server (GET samples/status tự hỏi lại khi còn phiếu chờ). ZIP của dự án
+  // mà trang này chưa có dòng (mở lại trang khi đang giải nén) vẫn hiện để biết còn việc nền.
+  const zipById = new Map((st?.zipImports ?? []).map((z) => [z.id, z]));
+  const shownRows = rows.map((r) => {
+    const z = r.zipId ? zipById.get(r.zipId) : undefined;
+    return z ? { ...r, ...stageFromZip(z) } : r;
+  });
+  const serverZipRows: Row[] = (st?.zipImports ?? [])
+    .filter((z) => !rows.some((r) => r.zipId === z.id))
+    .map((z) => ({ uid: z.id, name: z.name, size: z.sizeBytes, progress: 1, zipId: z.id, ...stageFromZip(z) }));
+  const allRows = [...shownRows, ...serverZipRows];
+  const showProgress = allRows.length > 0 || total > 0;
 
   return (
     <div className="space-y-6">
@@ -468,7 +503,7 @@ export function DataTab({ project: p }: { project: Project }) {
               )}
               {p.modality === "image" && (
                 <TabsContent value="zip" className="space-y-2 pt-3">
-                  <p className="text-sm text-muted-foreground">Chỉ nhận jpg / png / webp trong ZIP (≤ 200 MB); ảnh trùng nội dung bị bỏ. ZIP được giải nén và kiểm tra ngay khi upload xong.</p>
+                  <p className="text-sm text-muted-foreground">Chỉ nhận jpg / png / webp trong ZIP (≤ 200 MB); ảnh trùng nội dung bị bỏ. ZIP được đẩy thẳng lên kho rồi hệ thống giải nén, kiểm tra từng ảnh ở chế độ nền — có thể rời trang trong lúc chờ.</p>
                   <label className={busy ? "pointer-events-none opacity-50" : ""}>
                     <input
                       type="file"
@@ -603,7 +638,7 @@ export function DataTab({ project: p }: { project: Project }) {
                   <StatusBadge entry={["Đã xử lý " + (st?.ready ?? 0), "success"]} />
                   {(st?.failed ?? 0) > 0 && <StatusBadge entry={["Lỗi " + st!.failed, "danger"]} />}
                   {(st?.preparingVideo ?? 0) > 0 && <StatusBadge entry={["Video đang chuẩn bị " + st!.preparingVideo, "info"]} />}
-                  {draft && (st?.failed ?? 0) > 0 && (
+                  {draft && ((st?.failed ?? 0) > 0 || (st?.zipImports ?? []).some((z) => z.status === "failed")) && (
                     <Button variant="ghost" size="sm" className="ml-auto" onClick={() => void removeFailed()}>
                       <Trash2 /> Xoá mẫu lỗi
                     </Button>
@@ -611,16 +646,18 @@ export function DataTab({ project: p }: { project: Project }) {
                 </div>
                 <Progress value={total === 0 ? 0 : (((st?.ready ?? 0) + (st?.failed ?? 0)) / total) * 100} />
                 <p className="text-xs text-muted-foreground">
-                  {inProgress > 0 ? `Còn ${inProgress} file đang xử lý — có thể rời trang, hệ thống vẫn tiếp tục.` : "Đã xử lý xong tất cả file."}
+                  {inProgress > 0
+                    ? `Còn ${inProgress} file đang xử lý${zipBusy > 0 ? ` (trong đó ${zipBusy} file ZIP đang chờ / đang giải nén)` : ""} — có thể rời trang, hệ thống vẫn tiếp tục.`
+                    : "Đã xử lý xong tất cả file."}
                 </p>
               </div>
             )}
-            {rows.length > 0 && (
+            {allRows.length > 0 && (
               <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                {rows.slice(0, 300).map((r) => (
+                {allRows.slice(0, 300).map((r) => (
                   <UploadRow key={r.uid} r={r} />
                 ))}
-                {rows.length > 300 && <li className="text-center text-xs text-muted-foreground">…và {rows.length - 300} file nữa (xem ở danh sách mẫu bên dưới).</li>}
+                {allRows.length > 300 && <li className="text-center text-xs text-muted-foreground">…và {allRows.length - 300} file nữa (xem ở danh sách mẫu bên dưới).</li>}
               </ul>
             )}
           </CardContent>

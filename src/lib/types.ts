@@ -230,6 +230,40 @@ export type IngestStatus = {
   failed: number;
   /** Số file video đã nạp xong nhưng media-svc còn chuẩn bị bản chuẩn (chưa publish được). */
   preparingVideo: number;
+  /** File ZIP ảnh của dự án (mới nhất trước) — giải nén chạy nền; đang chờ / đang giải nén thì chưa publish được. */
+  zipImports: ZipImport[];
+};
+
+/** Một file ZIP ảnh: upload thẳng lên kho, hệ thống giải nén nền (POST /projects/{id}/samples/zip {key}). */
+export type ZipImport = {
+  id: string;
+  name: string;
+  sizeBytes: number;
+  status: "queued" | "processing" | "done" | "failed";
+  /** Số file trong ZIP đã đọc (tăng dần khi đang giải nén). */
+  processed: number;
+  /** Số ảnh hợp lệ thành mẫu (khi done). */
+  ready: number;
+  /** Số file bỏ qua: không phải ảnh, quá lớn, trùng nội dung (khi done). */
+  skipped: number;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+};
+
+/** Một lần tạo file kết quả (POST /annotations/projects/{id}/exports) — tạo nền, xong thì tải qua downloadPath. */
+export type ExportJob = {
+  id: string;
+  projectId: string;
+  format: string;
+  status: "queued" | "processing" | "ready" | "failed";
+  fileName: string | null;
+  sizeBytes: number | null;
+  sampleCount: number | null;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+  downloadPath: string | null;
 };
 
 /** Kết quả một lần gửi dữ liệu (dòng JSON / nhập nguồn ngoài / ZIP). */
